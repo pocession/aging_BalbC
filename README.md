@@ -27,4 +27,6 @@ aging_BalbC
 │   ├── salmon: read counts 
 │   ├── sample
 │   ├──├── salmon_quant: quant.sf : this file is going to ge used for downstream analysis. E.g DeSeq2
+├── microbome: all sequencing data of gut microbiomes
+│   ├── fastq: raw fastq files
 ```
