@@ -16,8 +16,8 @@ aging_BalbC
 │   ├── ├── 2018: *.fastq.gz
 │   ├── ├── 2022: *.fastq.gz
 │   ├── trimmed: trimed fastq files
-│   ├── ├── *.fq: trimed by [Trimgalore](https://www.bioinformatics.babraham.ac.uk/projects/trim_galore/)
-│   ├── ├── *.trimed.fq: trimed by a script provided by [Nugen](https://github.com/nugentechnologies/NuMetRRBS/blob/master/README.md) (This is the file used for bismark).
+│   ├── ├── *.fq: trimed by Trimgalore
+│   ├── ├── *.trimed.fq: trimed by a script provided by Nugen (This is the file used for bismark).
 │   ├── bismapped : mapped files with bismark
 │   ├── ├── *_pe.bam: pair-end mapped files
 │   ├── ├── *_ambiguous_reads_*.fq.gz: sequences can't be mapped
