@@ -8,9 +8,10 @@ All raw data and meta are stored in RIMLS server. The path is `/ceph/rimlsfnwi/d
 Reduced-representation bisulfite sequencing (RRBS-Seq ) experiments were conducted twice. The first experiment included small intestine samples and was conducted at 2018. The second experiment included large intestine sample and was conducted at 2022.
 
 ## RNANseqv1.1
-
+poly-A mRNA sequencing experiments were conducted at 2018. The experiment included three tissues: SI, LI, CE, two conditions: SPF, GF, and three ages: 3w, 17w, 78w. The analysis has been conducted, please check this repository.
+ 
 ## microbiome
-16srDNA sequencing experiments were conducted at 2022-2023. The experiment included three tissues: SI, LI, CE, two conditions: SPF, GF, and three ages: 3w, 17w, 78w. Those files were not analyzed yet. 
+16SrDNA sequencing experiments were conducted at 2022-2023. The experiment included three tissues: SI, LI, CE, two conditions: SPF, GF, and three ages: 3w, 17w, 78w. Those files were not analyzed yet. 
 
 ## File structure
 ```
