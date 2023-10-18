@@ -42,7 +42,7 @@ aging_BalbC
 │   ├── ├── 2018
 │   ├── ├── 2022
 |
-├── RNAseqv1.1: all the methylation sequencing data
+├── RNAseqv1.1: all the RNA sequencing data
 │   ├── fastq: raw fastq files
 │   ├── ├── *.fastq.gz
 |   |
