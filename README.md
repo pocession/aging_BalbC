@@ -16,7 +16,9 @@ poly-A mRNA sequencing experiments were conducted at 2018. The experiment includ
 ## File structure
 ```
 aging_BalbC
-├── meta files
+├── sampleSheet: sample sheet files
+│   ├── *.xlsx
+│ 
 ├── RRBS: all the methylation sequencing data
 │   ├── fastq: raw fastq files
 │   ├── ├── ├──*.fastq.gz
