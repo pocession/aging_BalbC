@@ -2,8 +2,8 @@
 This project is to identify how murine genes in intestine are regulated by microbiota through methylation changes.
 
 ## Data sotrage
-All raw data and meta are stored in RIMLS server. The path is `/ceph/rimlsfnwi/data/cellbio/minoda/aging_BalbC`.
-All the downstream analysis, including DEA (differnetially-expression gene analysis), DMR (differentially-methylated regions), and microbiome 16S rRNA profileing, are temporarily saved in [Musa lab's google drive](https://drive.google.com/drive/folders/1mSEwu7dthgF8uXsbrcImllVv80rD3d_D?usp=drive_link).
+- All raw data and meta are stored in RIMLS server. The path is `/ceph/rimlsfnwi/data/cellbio/minoda/aging_BalbC`.
+- All the downstream analysis, including DEA (differnetially-expression gene analysis), DMR (differentially-methylated regions), and microbiome 16S rRNA profileing, are temporarily saved in [Musa lab's google drive](https://drive.google.com/drive/folders/1mSEwu7dthgF8uXsbrcImllVv80rD3d_D?usp=drive_link).
 
 ## RRBS
 Reduced-representation bisulfite sequencing (RRBS-Seq ) experiments were conducted twice. The first experiment included small intestine samples and was conducted at 2018. The second experiment included large intestine sample and was conducted at 2022.
