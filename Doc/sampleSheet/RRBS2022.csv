@@ -1,0 +1,13 @@
+ID,Age,Condition,Tissue,Replicate,Bisulfite,OX,Sample,Year
+1,3 weeks,GF,LI,1,+,+,S02140,2022
+2,3 weeks,SPF,LI,1,+,+,S02141,2022
+3,17 weeks,GF,LI,1,+,+,S02142,2022
+4,17 weeks,SPF,LI,1,+,+,S02143,2022
+5,1.5 year,GF,LI,1,+,+,S02144,2022
+6,1.5 year,SPF,LI,1,+,+,S02145,2022
+7,3 weeks,GF,LI,1,-,-,S02146,2022
+8,3 weeks,SPF,LI,1,-,-,S02147,2022
+9,17 weeks,GF,LI,1,-,-,S02148,2022
+10,17 weeks,SPF,LI,1,-,-,S02149,2022
+11,1.5 year,GF,LI,1,-,-,S02150,2022
+12,1.5 year,SPF,LI,1,-,-,S02151,2022
