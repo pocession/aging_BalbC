@@ -20,8 +20,20 @@ outputFiguresDir <- here::here("Results", "Figures")
 sampleSheet <- read.csv(file.path(sampleSheetDir, paste0("RRBS",Year,".csv")))
 
 ## Append raw file names on the sample sheet
+<<<<<<< HEAD
+files <- data.frame(fname = list.files(inputDir), Sample = "")
+for ( i in 1:nrow(files)) {
+  files$Sample[i] <- str_split(files$fname[i],"_")[[1]][[1]]
+}
+
+sampleSheet <- sampleSheet |>
+  dplyr::left_join(files, by = "Sample") |>
+  dplyr::mutate(fpath = paste0(inputDir,"/",fname))
+remove(files)
+=======
 ## For 2018: files$Sample[i] <- str_split(files$fname[i],"-|_")[[1]][[2]]
 ## For 2022: files$Sample[i] <- str_split(files$fname[i],"_")[[1]][[1]]
+
 files <- data.frame(fname = list.files(inputDir), Sample = "")
 for ( i in 1:nrow(files)) {
   files$Sample[i] <- str_split(files$fname[i],"-|_")[[1]][[2]]
@@ -38,7 +50,8 @@ files <- files |>
 sampleSheet <- sampleSheet |>
   dplyr::left_join(files, by = "ID") |>
   dplyr::mutate(fpath = paste0(inputDir,"/",fname))
-remove(files)
+remove(files) 
+>>>>>>> ef90439ef5fea4a42db2f8a7fd7a057145d9212d
 
 ## Change the age
 sampleSheet <- sampleSheet |>
@@ -61,18 +74,30 @@ sampleList <- sampleSheet |>
 
 groupList <- sampleList |> dplyr::distinct(Age_w) |> unlist()
 
+<<<<<<< HEAD
+=======
 ## For 2018: treatment = rep(c(1,0), 4)
 ## For 2022: treatment = rep(c(1,0), 2)
+>>>>>>> ef90439ef5fea4a42db2f8a7fd7a057145d9212d
 myObjList <- list()
 for (i in 1:length(groupList)) {
   sampleList_subset <- sampleList |> dplyr::filter(Age_w == groupList[[i]])
   myobj <- methylKit::methRead(as.list(sampleList_subset$fpath),sample.id = as.list(sampleList_subset$index), assembly="mm10",
+<<<<<<< HEAD
+                               treatment = rep(c(1,0), 2), mincov = 10, pipeline = "bismarkCytosineReport")
+  myObjList[[groupList[i]]] <- myobj
+}
+remove(sampleList, i, myobj)
+
+
+=======
                                treatment = rep(c(1,0), 4), mincov = 10, pipeline = "bismarkCytosineReport")
   myObjList[[groupList[i]]] <- myobj
 }
 remove(i, myobj)
 
 ## Filter the methylation reads
+>>>>>>> ef90439ef5fea4a42db2f8a7fd7a057145d9212d
 filteredMyObjList <- list()
 for (i in 1:length(groupList)) {
   myobj <- myObjList[[groupList[i]]]
@@ -81,7 +106,10 @@ for (i in 1:length(groupList)) {
 }
 remove(i, myobj, filteredObj)
 
+<<<<<<< HEAD
+=======
 ## Summarize the methylation counts per 100bp
+>>>>>>> ef90439ef5fea4a42db2f8a7fd7a057145d9212d
 tileList <- list()
 for (i in 1:length(groupList)) {
   filteredOobj <- filteredMyObjList[[groupList[i]]]
