@@ -7,6 +7,7 @@ library(here)
 library(stringr)
 
 # Global variables ====
+# Year <- 2022
 Year <- 2018
 
 # Dir ====
@@ -84,11 +85,12 @@ remove(i, myobj, filteredObj)
 ## Summarize the methylation counts per 100bp
 tileList <- list()
 for (i in 1:length(groupList)) {
-  filteredOobj <- filteredMyObjList[[groupList[i]]]
-  tile <- tileMethylCounts(filteredOobj,win.size=100,step.size=100)
+  filteredObj <- filteredMyObjList[[groupList[i]]]
+  tile <- tileMethylCounts(filteredObj,win.size=100,step.size=100)
   meth=unite(tile, destrand=FALSE)
   tileList[[groupList[i]]] <- meth
 }
+remove(i, filteredObj, tile, meth)
 
 # Save Meth data ====
 for (i in 1:length(groupList)) {
@@ -98,4 +100,5 @@ for (i in 1:length(groupList)) {
   tile.df <- tileList[[groupList[[i]]]]
   write.csv(tile.df, file.path(outputTmpDir, paste0("RRBS_", Year, "_", tissue, "_methTile100_", groupList[[i]],".csv")))
 }
+remove(i, tissue,sampleList_subset, tile.df)
 
