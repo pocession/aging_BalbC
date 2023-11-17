@@ -7,25 +7,25 @@ library(here)
 library(stringr)
 
 # Global variables ====
-# Year <- 2022
-Year <- 2018
+YEAR <- 2022
+# YEAR <- 2018
 
 # Dir ====
 sampleSheetDir <- here::here("Doc","sampleSheet")
-inputDir <- here::here("Raw", "RRBS", paste0("cpg", "_", Year))
+inputDir <- here::here("Raw", "RRBS", paste0("cpg", "_", YEAR))
 outputStatisticsDir <- here::here("Results", "Statistics")
 outputTmpDir <- here::here("Results", "Tmp")
 outputFiguresDir <- here::here("Results", "Figures")
 
 # Sample sheet ====
-sampleSheet <- read.csv(file.path(sampleSheetDir, paste0("RRBS",Year,".csv")))
+sampleSheet <- read.csv(file.path(sampleSheetDir, paste0("RRBS",YEAR,".csv")))
 
 ## Append raw file names on the sample sheet
 ## For 2018: files$Sample[i] <- str_split(files$fname[i],"-|_")[[1]][[2]]
 ## For 2022: files$Sample[i] <- str_split(files$fname[i],"_")[[1]][[1]]
 files <- data.frame(fname = list.files(inputDir), Sample = "")
 for ( i in 1:nrow(files)) {
-  files$Sample[i] <- str_split(files$fname[i],"-|_")[[1]][[2]]
+  files$Sample[i] <- str_split(files$fname[i],"_")[[1]][[1]]
   files$Sample[i] <- files$Sample[i]
 }
 
@@ -37,7 +37,7 @@ files <- files |>
 ## For 2018: dplyr::left_join(files, by = "ID") |>
 ## For 2022: dplyr::left_join(files, by = "Sample") |>
 sampleSheet <- sampleSheet |>
-  dplyr::left_join(files, by = "ID") |>
+  dplyr::left_join(files, by = "Sample") |>
   dplyr::mutate(fpath = paste0(inputDir,"/",fname))
 remove(files)
 
@@ -53,52 +53,32 @@ sampleSheet <- sampleSheet |>
 sampleSheet <- sampleSheet |>
   dplyr::mutate(index = paste(Tissue, Condition, Age_w, OX, Replicate, sep = "_"))
 
-# Get methylatio count ====
-## Separate samples based on ages: 3, 17, 78
+# Get methylation count ====
 ## Read methylation extraction files
+## GF = 1, SPF = 0
+## For 2018: treatment = rep(c(1,1,0,0), 6)
+## For 2022: treatment = rep(c(1, 0, 1, 0, 1, 0), 2)
+## long process
+methylObj <- methylKit::methRead(as.list(sampleSheet$fpath),sample.id = as.list(sampleSheet$index), 
+                                 treatment = rep(c(1, 0, 1, 0, 1, 0), 2), assembly="mm10", mincov = 10, pipeline = "bismarkCytosineReport")
 
-sampleList <- sampleSheet |>
-  dplyr::mutate(index = paste(Condition, Age_w, sep = "_"))
-
-groupList <- sampleList |> dplyr::distinct(Age_w) |> unlist()
-
-## For 2018: treatment = rep(c(1,0), 4)
-## For 2022: treatment = rep(c(1,0), 2)
-myObjList <- list()
-for (i in 1:length(groupList)) {
-  sampleList_subset <- sampleList |> dplyr::filter(Age_w == groupList[[i]])
-  myobj <- methylKit::methRead(as.list(sampleList_subset$fpath),sample.id = as.list(sampleList_subset$index), assembly="mm10",
-                               treatment = rep(c(1,0), 4), mincov = 10, pipeline = "bismarkCytosineReport")
-  myObjList[[groupList[i]]] <- myobj
-}
-remove(i, myobj)
-
-## Filter the methylation reads
-filteredMyObjList <- list()
-for (i in 1:length(groupList)) {
-  myobj <- myObjList[[groupList[i]]]
-  filteredObj <- filterByCoverage(myobj,lo.count=10,lo.perc=NULL, hi.count=NULL,hi.perc=99.9)
-  filteredMyObjList[[groupList[i]]] <- filteredObj
-}
-remove(i, myobj, filteredObj)
+## Filter the methylation count by coverage 
+filteredObj <- filterByCoverage(methylObj,lo.count=10,lo.perc=NULL, hi.count=NULL,hi.perc=99.9)
+remove(methylObj)
 
 ## Summarize the methylation counts per 100bp
-tileList <- list()
-for (i in 1:length(groupList)) {
-  filteredObj <- filteredMyObjList[[groupList[i]]]
-  tile <- tileMethylCounts(filteredObj,win.size=100,step.size=100)
-  meth=unite(tile, destrand=FALSE)
-  tileList[[groupList[i]]] <- meth
-}
-remove(i, filteredObj, tile, meth)
+## long process
+## win.size = step.size; non-overlapping tiling
+tile <- tileMethylCounts(filteredObj,win.size=100,step.size=100)
 
-# Save Meth data ====
-for (i in 1:length(groupList)) {
-  sampleList_subset <- sampleList |> dplyr::filter(Age_w == groupList[[i]])
-  tissue <- sampleList_subset[i,]$Tissue
-  write.csv(sampleList_subset,file.path(outputTmpDir, paste0("RRBS_",Year,"_", tissue,"_sampleSheet_", groupList[[i]],".csv")))
-  tile.df <- tileList[[groupList[[i]]]]
-  write.csv(tile.df, file.path(outputTmpDir, paste0("RRBS_", Year, "_", tissue, "_methTile100_", groupList[[i]],".csv")))
-}
-remove(i, tissue,sampleList_subset, tile.df)
+# meth <- unite(tile, destrand=FALSE)
+remove(filteredObj)
+
+# Save Meth data and sampleSheet ====
+tissue <- sampleSheet[1,]$Tissue
+saveRDS(tile, file.path(outputTmpDir, paste0("RRBS_", YEAR, "_", tissue, "_methTile100_", ".rds")))
+write.csv(sampleSheet, file.path(outputTmpDir, paste0("RRBS_", YEAR, "_", tissue, "_sampleSheet_",".csv")))
+# write.csv(tile, file.path(outputTmpDir, paste0("RRBS_", YEAR, "_", tissue, "_methTile100_",".csv")))
+
+remove(tile, meth)
 
