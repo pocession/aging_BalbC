@@ -48,6 +48,7 @@ for (i in 1:length(sampleIdList)) {
 # 2022: c(7, 8, 9, 10, 11, 12)
 for (i in c(7, 8, 9, 10, 11, 12)) {
   sampleID <- sampleIdList[i]
+  tile[[i]]$freqC <- 100*(tile[[i]]$numCs/tile[[i]]$coverage)
   write.csv(tile[[i]], file.path(outputTmpDir,paste0(sampleID,"_total.csv")),row.names=FALSE,quote=FALSE)
 }
 remove(i, sampleID)
@@ -57,18 +58,21 @@ remove(i, sampleID)
 # 2022: c(1, 2, 3, 4, 5, 6)
 for (i in c(1, 2, 3, 4, 5, 6)) {
   sampleID <- sampleIdList[i]
+  tile[[i]]$freqC <- 100*(tile[[i]]$numCs/tile[[i]]$coverage)
   write.csv(tile[[i]], file.path(outputTmpDir,paste0(sampleID,"_5hmc.csv")),row.names=FALSE,quote=FALSE)
 }
 remove(i, sampleID)
 
 # Get 5mc subset ====
 # 2018: c(1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23)
-# 2018: realMc <- methylKit::adjustMethylC(mc = tile[[i+1]], hmc = tile[[i]])
 # 2022: c(1, 2, 3, 4, 5, 6)
-# 2022: realMc <- methylKit::adjustMethylC(mc = tile[[i+6]], hmc = tile[[i]])
 for (i in c(1, 2, 3, 4, 5, 6)) {
   sampleID <- sampleIdList[i]
+  
+  # 2018: realMc <- methylKit::adjustMethylC(mc = tile[[i+1]], hmc = tile[[i]])
+  # 2022: realMc <- methylKit::adjustMethylC(mc = tile[[i+6]], hmc = tile[[i]])
   realMc <- methylKit::adjustMethylC(mc = tile[[i+6]], hmc = tile[[i]])
+  realMc$freqC <- 100*(realMc$numCs/realMc$coverage)
   write.csv(realMc, file.path(outputTmpDir,paste0(sampleID,"_5mc.csv")),row.names=FALSE,quote=FALSE)
 }
 remove(i, sampleID, realMc)
