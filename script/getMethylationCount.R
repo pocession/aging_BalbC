@@ -7,8 +7,8 @@ library(here)
 library(stringr)
 
 # Global variables ====
-YEAR <- 2022
-# YEAR <- 2018
+#YEAR <- 2022
+YEAR <- 2018
 
 # Dir ====
 sampleSheetDir <- here::here("Doc","sampleSheet")
