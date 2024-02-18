@@ -4,7 +4,7 @@ The repository hosts analysis, including 5-Methylcytosine (5mC) levels, 5-Hydrox
 ## Statistics
 Host all data frames.
 
-- [Total](./Statistics/Total/): the 5mc + 5hmc levels for all samples.
+- [5hmc + 5mc](./Statistics/5hmc_5mc/): the 5mc + 5hmc levels for all samples.
 - [5mc](./Statistics/5mc/): 5mc levels for all samples.
 - [5hmc](./Statistics/5hmc/): 5hmc levels for all samples.
 - [TMP](./Statistics/TPM/): expression levles of genes for all samples, as shown in transcripts per millions (TPM). The files with prefix "vstTPM" are expression levels that have been applied by variance stabilizing transformation (vst). 
