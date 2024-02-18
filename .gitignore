@@ -3,9 +3,3 @@
 .RData
 .Ruserdata
 .DS_Store
-
-# Raw data
-Raw/*
-
-# Result data
-Results/Tmp/*
