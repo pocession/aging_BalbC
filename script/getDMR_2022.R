@@ -13,11 +13,11 @@ inputTmpDir <- here::here("Results", "Tmp")
 outputTmpDir <- here::here("Results", "Tmp")
 
 # Global variables ====
-YEAR <- 2018
-# YEAR <- 2022
+# YEAR <- 2018
+YEAR <- 2022
 
-TISSUE <- "SI"
-# TISSUE <- "LI"
+# TISSUE <- "SI"
+TISSUE <- "LI"
 
 group_list <- c(3, 17, 78)
 
@@ -55,7 +55,7 @@ remove(i, index,sampleSheetDf, sampleSheet_subset)
 methylObjList <- list()
 for (i in 1:length(group_list)) {
   methylObj <- methylKit::methRead(as.list(sampleSheetList[[i]]$fpath),sample.id = as.list(sampleSheetList[[i]]$index), 
-                                   treatment = c(1, 0, 1, 0), sep = ",", 
+                                   treatment = c(1, 0), sep = ",", 
                                    pipeline=list(fraction=FALSE,chr.col=1,start.col=2,end.col=3,
                                                  strand.col=4, coverage.col=5,freqC.col=8), 
                                    assembly="mm10")
@@ -99,7 +99,7 @@ remove(i, index,sampleSheetDf, sampleSheet_subset)
 methylObjList <- list()
 for (i in 1:length(group_list)) {
   methylObj <- methylKit::methRead(as.list(sampleSheetList[[i]]$fpath),sample.id = as.list(sampleSheetList[[i]]$index), 
-                                   treatment = c(1, 0, 1, 0), sep = ",", 
+                                   treatment = c(1, 0), sep = ",", 
                                    pipeline=list(fraction=FALSE,chr.col=1,start.col=2,end.col=3,
                                                  strand.col=4, coverage.col=5,freqC.col=8), 
                                    assembly="mm10")
@@ -143,7 +143,7 @@ remove(i, index,sampleSheetDf, sampleSheet_subset)
 methylObjList <- list()
 for (i in 1:length(group_list)) {
   methylObj <- methylKit::methRead(as.list(sampleSheetList[[i]]$fpath),sample.id = as.list(sampleSheetList[[i]]$index), 
-                                   treatment =  c(1, 0, 1, 0), sep = ",", 
+                                   treatment =  c(1, 0), sep = ",", 
                                    pipeline=list(fraction=FALSE,chr.col=1,start.col=2,end.col=3,
                                                  strand.col=4, coverage.col=5,freqC.col=8), 
                                    assembly="mm10")
