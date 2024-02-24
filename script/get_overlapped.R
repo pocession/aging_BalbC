@@ -9,6 +9,7 @@ TxDb <- TxDb.Mmusculus.UCSC.mm10.knownGene
 
 # Transcript data frames ====
 transcript_df <- as.data.frame(transcripts(TxDb))
+gene_df <- as.data.frame(genes(TxDb))
 
 # Dir ====
 inputDir <- here::here("Results/Statistics/DMR")
