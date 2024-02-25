@@ -1,23 +1,62 @@
-# This script is used to get methylation count from Bismark methylation extraction files
+---
+title: "Get unadjusted methylation count from Bismark methylation extraction files"
+author: "Tsunghan Hsieh"
+description: >
+  This file demonstrates how to get methylation count from the bismark summary file.
+date: "`r format(Sys.Date(), format='%d-%m-%Y')`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Clustering_Analysis}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
 
-# Library ====
+```{r setup, echo=FALSE, message=FALSE, warning=FALSE}
+# Set RMarkDown options
+knitr::opts_chunk$set(echo = TRUE, warning = TRUE, message = TRUE, eval = TRUE, collapse = FALSE)
+
+# Turn off scientific notation
+options(scipen = 999)
+
+```
+
+
+# Set-up
+***
+
+## Load libraries
+```{r library}
 library(dplyr)
 library(methylKit)
 library(here)
 library(stringr)
+```
 
-# Global variables ====
-# YEAR <- 2018
-YEAR <- 2022
+## Set dir
+***
+Set input and output dir.
 
-
-# Dir ====
+```{r dir}
 sampleSheetDir <- here::here("Doc","sampleSheet")
-inputDir <- here::here("Raw", "RRBS", paste0("cpg", "_", YEAR))
+inputDir <- here::here("Preprocessed", "RRBS", paste0("cpg", "_", YEAR))
 outputStatisticsDir <- here::here("Results", "Statistics")
 outputTmpDir <- here::here("Results", "Tmp")
 outputFiguresDir <- here::here("Results", "Figures")
+```
 
+## Set global variable
+***
+Set global variable
+```{r GLOBAL}
+YEAR <- 2022
+```
+
+# Load and arrange the data
+## Sample file
+***
+Read sample file.
+
+```{r sample_file}
 # Sample sheet ====
 sampleSheet <- read.csv(file.path(sampleSheetDir, paste0("RRBS",YEAR,".csv")))
 
@@ -53,8 +92,13 @@ sampleSheet <- sampleSheet |>
 ## Get new sample index
 sampleSheet <- sampleSheet |>
   dplyr::mutate(index = paste(Tissue, Condition, Age_w, OX, Replicate, sep = "_"))
+```
 
-# Get methylation count ====
+# Get methylation count 
+***
+Get the methylation counts.
+
+```{r methylation}
 ## Read methylation extraction files
 ## GF = 1, SPF = 0
 ## For 2018: treatment = rep(c(1,1,0,0), 6)
@@ -74,12 +118,17 @@ tile <- tileMethylCounts(filteredObj,win.size=100,step.size=100)
 
 # meth <- unite(tile, destrand=FALSE)
 remove(filteredObj)
+```
 
-# Save Meth data and sampleSheet ====
+# Write the files.
+***
+Write the files.
+
+```{r write_file}
 tissue <- sampleSheet[1,]$Tissue
 saveRDS(tile, file.path(outputTmpDir, paste0("RRBS_", YEAR, "_", tissue, "_methTile100_", ".rds")))
 write.csv(sampleSheet, file.path(outputTmpDir, paste0("RRBS_", YEAR, "_", tissue, "_sampleSheet_",".csv")))
 # write.csv(tile, file.path(outputTmpDir, paste0("RRBS_", YEAR, "_", tissue, "_methTile100_",".csv")))
 
 remove(tile)
-
+```
