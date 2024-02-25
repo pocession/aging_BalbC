@@ -5,11 +5,4 @@
 .DS_Store
 
 # Results
-Results/Figures/*
-Results/Statistics/*
-Results/Tmp/*
-
-# Raw
-Processed/microbiome/*
-Processed/RNAseq/*
-Processed/RRBS/*
+Results/*
