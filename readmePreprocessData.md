@@ -1,4 +1,4 @@
-# The pre-processed data
+# The processing data
 The raw data of RNAseq and RRBSseq were further pre-processed with the following bash and Python scripts. The pre-processed data are stored in the [Preprocessed data repository](./Results/Preprocessed/).
 
 # Preprocess
