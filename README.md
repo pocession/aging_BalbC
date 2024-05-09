@@ -17,7 +17,7 @@ Two reduced-representation bisulfite sequencing (RRBS-Seq) experiments were cond
 16SrDNA sequencing experiments were conducted at 2022-2023. The experiment included three tissues: SI, LI, CE, two conditions: SPF, GF, and three ages: 3w, 17w, 78w. Those files were not analyzed yet. 
 
 ## Change log
-- 20240509: update functions. Also update annotated DMR files to [DMR_annotated](./Results/Statistics/DMR_annotated/) repository.
+- 20240509: update functions. Also update annotated DMR files to [DMR_annotated](./Results/Statistics/DMR_annotated/) repository. Codes of this repository are also going to public. All data and presentation files are not shown.
 - 20240225: re-organize the readme files and scripts.
 - 20240224: upload annotated DMR files to [DMR_annotated](./Results/Statistics/DMR_annotated/) repository.
 - 20240218: upload all raw files and temporary results. Re-organized the [Results](./Results/) repository.
