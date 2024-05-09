@@ -1,8 +1,8 @@
 ---
-title: "Get adjusted methylation count from Bismark methylation extraction files"
+title: "Get annotated, differentially-methylated regions by comparing samples from two conditions"
 author: "Tsunghan Hsieh"
 description: >
-  This file demonstrates how to get methylation count from the bismark summary file.
+  This file demonstrates how to get annotated DMR.
 date: "`r format(Sys.Date(), format='%d-%m-%Y')`"
 output: rmarkdown::html_vignette
 vignette: >
@@ -23,11 +23,14 @@ devtools::document()
 devtools::load_all()
 ```
 
-# TODO
+# Get adjusted methylation counts
 ***
+We first get the methylation counts for each sample.
+
 ```{r todo}
 # Run the following Rmd file:
 # ./Doc/getUnadjustedMethylationCount2018.rmd.
+# ./Doc/getUnadjustedMethylationCount2022.rmd.
 ```
 
 # Set-up
@@ -47,17 +50,13 @@ Set input and output dir.
 
 ```{r dir}
 sampleSheetDir <- here::here("Doc","sampleSheet")
-inputTmpDir <- here::here("Results", "Tmp")
-outputTmpDir <- here::here("Results", "Tmp")
+inputDir5mc <- here::here("Results", "Statistics", "5mc")
+inputDir5hmc <- here::here("Results", "Statistics", "5hmc")
+inputDirTotal <- here::here("Results", "Statistics", "5hmc_5mc")
+outputDir <- here::here("Results", "Statistics", "DMR")
+outputDirAnnotated <- here::here("Results", "Statistics", "DMR_annotated")
 ```
 
-## Set global variable
-***
-Set global variable
-```{r GLOBAL}
-YEAR <- 2018
-TISSUE <- "SI"
-```
 
 # Load and arrange the data
 ## Sample file
@@ -91,42 +90,22 @@ for (i in 1:length(sampleIdList)) {
 }
 ```
 
-# Get methylation count 
+# Get DMR
 ***
-Get the methylation counts for 5hmc + 5mc, 5hmc, and 5mc.
+Get DMR for 5hmc + 5mc, 5hmc, and 5mc.
 
-```{r methylation}
-# Get 5hmc+5mc subset ====
-# 2018: c(2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24)
-# 2022: c(7, 8, 9, 10, 11, 12)
-for (i in c(2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24)) {
-  sampleID <- sampleIdList[i]
-  tile[[i]]$freqC <- 100*(tile[[i]]$numCs/tile[[i]]$coverage)
-  write.csv(tile[[i]], file.path(outputTmpDir,paste0(sampleID,"_total.csv")),row.names=FALSE,quote=FALSE)
-}
-remove(i, sampleID)
+```{r DMR}
 
-# Get 5hmc subset ====
-# 2018: c(1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23)
-# 2022: c(1, 2, 3, 4, 5, 6)
-for (i in c(1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23)) {
-  sampleID <- sampleIdList[i]
-  tile[[i]]$freqC <- 100*(tile[[i]]$numCs/tile[[i]]$coverage)
-  write.csv(tile[[i]], file.path(outputTmpDir,paste0(sampleID,"_5hmc.csv")),row.names=FALSE,quote=FALSE)
-}
-remove(i, sampleID)
+```
 
-# Get 5mc subset ====
-# 2018: c(1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23)
-# 2022: c(1, 2, 3, 4, 5, 6)
-for (i in c(1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23)) {
-  sampleID <- sampleIdList[i]
-  
-  # 2018: realMc <- methylKit::adjustMethylC(mc = tile[[i+1]], hmc = tile[[i]])
-  # 2022: realMc <- methylKit::adjustMethylC(mc = tile[[i+6]], hmc = tile[[i]])
-  realMc <- methylKit::adjustMethylC(mc = tile[[i+1]], hmc = tile[[i]])
-  realMc$freqC <- 100*(realMc$numCs/realMc$coverage)
-  write.csv(realMc, file.path(outputTmpDir,paste0(sampleID,"_5mc.csv")),row.names=FALSE,quote=FALSE)
+# Get annotated DMR
+Get annotated DMR for 5hmc + 5mc, 5hmc, and 5mc.
+```{r annotated_DMR}
+dmrList <- list.files(outputDir)
+for (file in dmrList) {
+  annotateDMR(
+    input = here::here(outputDir,file),
+    col_names = c("chr", "start", "end", "strand"),
+    output = NULL)
 }
-remove(i, sampleID, realMc)
 ```
