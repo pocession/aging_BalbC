@@ -31,7 +31,7 @@
 #' }
 #' 
 ## TODO
-## Run getDIRWithNoReplicate() to generate DIR files
+## Run getDMR2018.Rmd or getDMR2022.Rmd to get DMR data
 
 annotateDMR <- function(input, col_names, output = NULL) {
   # check input ----------------------------------------------------------------
@@ -88,16 +88,21 @@ annotateDMR <- function(input, col_names, output = NULL) {
   input_df_meth <- input_df[ , !(names(input_df) %in% col_names)]
   
   # Get the annotated data frame -----------------------------------------------
-  
+  ## Get annotation
   annotated_df <- .get_annotated_gr(input_df_pos, col_names)
-  final_df <- annotated_df |>
-    dplyr::left_join(input_df_meth, by = "id")
   
-  ## Rearrange the columns
-  final_data <- cbind(final_df[,2:4], final_df[,16:18], final_df[,6:15]) 
-  write.csv(final_data, output, row.names = FALSE)
+  ## Get id and annotation information
+  annotated_df_subset <- annotated_df |>
+    dplyr::select(id)
+  annotated_df_subset <- cbind(annotated_df_subset, annotated_df[,6:ncol(annotated_df)])
+  
+  final_df <- input_df_pos |>
+    dplyr::left_join(input_df_meth, by = "id") |>
+    dplyr::left_join(annotated_df_subset, by = "id")
+  
+  write.csv(final_df, output, row.names = FALSE)
   message("Done! The output is written in: ", output)
-  return(final_data)
+  return(final_df)
 }
 
 
@@ -109,6 +114,7 @@ annotateDMR <- function(input, col_names, output = NULL) {
 #' @author Tsunghan Hsieh
 #'
 #' @param input a character string specifying the input dataframe
+#' @param col_names a character vector specifying the column names of return dataframe
 #' @return a dataframe of annotated file
 #' @examples
 #' \dontrun{
@@ -152,7 +158,9 @@ annotateDMR <- function(input, col_names, output = NULL) {
 
   dm_annotated <- data.frame(dm_annotated)
   
+  ## Only pick up the first annotation
   dm_annotated <- dm_annotated |>
+    dplyr::distinct(id, .keep_all = TRUE) |>
     dplyr::select(-c(strand))
   
   ## Add the strand information back
@@ -166,11 +174,13 @@ annotateDMR <- function(input, col_names, output = NULL) {
   final_data <- dm_annotated |>
     dplyr::select(id, seqnames, start, end, strand)
   
+  ## Remove the strand column
   dm_annotated <- dm_annotated |>
-    dplyr::select(-c(id, strand))
+    dplyr::select(-c(strand))
   
   colnames(final_data) <- c("id", col_names)
-  final_data <- cbind(final_data, dm_annotated[,5:ncol(dm_annotated)])
+  final_data <- final_data |>
+    dplyr::left_join(dm_annotated[,5:ncol(dm_annotated)], by = "id")
   
   return(final_data)
 }
