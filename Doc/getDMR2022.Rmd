@@ -1,18 +1,60 @@
-# get DMR
-# This script is used to calculate differentially-methylated regions
+---
+title: "Get differentially-methylated regions (DMR) between GF and SPF mice"
+author: "Tsunghan Hsieh"
+description: >
+  This file demonstrates how to get methylation count from the bismark summary file.
+date: "`r format(Sys.Date(), format='%d-%m-%Y')`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Clustering_Analysis}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
 
-# library ====
+```{r setup, echo=FALSE, message=FALSE, warning=FALSE}
+# Set RMarkDown options
+knitr::opts_chunk$set(echo = TRUE, warning = TRUE, message = TRUE, eval = TRUE, collapse = FALSE)
+
+# Turn off scientific notation
+options(scipen = 999)
+
+# load all functions
+devtools::document()
+devtools::load_all()
+```
+
+# TODO
+***
+```{r todo}
+# Run the following Rmd file:
+# ./Doc/getAdjustedMethylationCount2018.rmd
+```
+
+# Set-up
+***
+
+## Load libraries
+```{r library}
 library(dplyr)
 library(methylKit)
 library(here)
 library(stringr)
+```
 
-# Dir ====
-sampleSheetDir <- here::here("Results", "Tmp")
-inputTmpDir <- here::here("Results", "Tmp")
-outputTmpDir <- here::here("Results", "Tmp")
+## Set dir
+***
+Set input and output dir.
 
-# Global variables ====
+```{r dir}
+sampleSheetDir <- here::here("Results")
+inputDir <- here::here("Results", "Statistics")
+outputDir <- here::here("Results", "Statistics")
+```
+
+## Set global variable
+***
+Set global variable
+```{r GLOBAL}
 # YEAR <- 2018
 YEAR <- 2022
 
@@ -20,26 +62,39 @@ YEAR <- 2022
 TISSUE <- "LI"
 
 group_list <- c(3, 17, 78)
+```
 
+# Sample sheet
+***
+
+```{r sampleSheet}
 # Get sample sheet ====
+sampleSheet_list <- list()
 sampleSheet <- read.csv(file.path(sampleSheetDir, paste0("RRBS_", YEAR, "_", TISSUE, "_sampleSheet_",".csv")))
 sampleSheet  <- sampleSheet [,2:ncol(sampleSheet)]
 
-sampleSheetTotal <- sampleSheet |>
+sampleSheet_list[["total"]] <- sampleSheet |>
   dplyr::filter(OX == "-") |>
-  dplyr::mutate(fpath = file.path(outputTmpDir,paste0(paste0(index,"_total.csv"))))
+  dplyr::mutate(fpath = file.path(inputDir,"5hmc_5mc",paste0(paste0(index,"_total.csv"))))
 
-sampleSheet5hmc <- sampleSheet |>
+sampleSheet_list[["5hmc"]] <- sampleSheet |>
   dplyr::filter(OX == "+") |>
-  dplyr::mutate(fpath = file.path(outputTmpDir,paste0(paste0(index,"_5hmc.csv"))))
+  dplyr::mutate(fpath = file.path(inputDir,"5hmc",paste0(paste0(index,"_5hmc.csv"))))
 
-sampleSheet5mc <- sampleSheet |>
+sampleSheet_list[["5mc"]] <- sampleSheet |>
   dplyr::filter(OX == "+") |>
-  dplyr::mutate(fpath = file.path(outputTmpDir,paste0(paste0(index,"_5mc.csv"))))
+  dplyr::mutate(fpath = file.path(inputDir,"5mc",paste0(paste0(index,"_5mc.csv"))))
 
+```
 
+# DMR
+## 5hmc + 5mc
+***
+
+```{r total}
 # 5hmc + 5mc ====
-sampleSheetDf <- sampleSheetTotal
+subset <- "total"
+sampleSheetDf <- sampleSheet_list[[subset]]
 sampleSheetList <- list()
 for (i in 1:length(group_list)) {
   sampleSheet_subset <- sampleSheetDf |>
@@ -77,13 +132,18 @@ remove(i, index, meth)
 ## Save into files ====
 for (i in 1:length(group_list)) {
   index <- as.character(group_list[[i]])
-  write.csv(dmrObjList[[index]], file.path(outputTmpDir, paste0("DMR_total_", YEAR, "_", TISSUE, "_", index, ".csv")), row.names = FALSE, quote = FALSE)
+  write.csv(dmrObjList[[index]], file.path(outputDir, "DMR", paste0("DMR_", subset, "_", YEAR, "_", TISSUE, "_", index, ".csv")), row.names = FALSE, quote = FALSE)
 }
 remove(i, index)
+```
 
+## 5hmc
+***
+
+```{r 5hmc}
 # 5hmc ====
-## Create sample sheet list
-sampleSheetDf <- sampleSheet5hmc
+subset <- "5hmc"
+sampleSheetDf <- sampleSheet_list[[subset]]
 sampleSheetList <- list()
 for (i in 1:length(group_list)) {
   sampleSheet_subset <- sampleSheetDf |>
@@ -118,16 +178,21 @@ for (i in 1:length(group_list)) {
 }
 remove(i, index, meth)
 
-## Save into files
+## Save into files ====
 for (i in 1:length(group_list)) {
   index <- as.character(group_list[[i]])
-  write.csv(dmrObjList[[index]], file.path(outputTmpDir, paste0("DMR_5hmc_", YEAR, "_", TISSUE, "_", index, ".csv")), row.names = FALSE, quote = FALSE)
+  write.csv(dmrObjList[[index]], file.path(outputDir, "DMR", paste0("DMR_", subset, "_",YEAR, "_", TISSUE, "_", index, ".csv")), row.names = FALSE, quote = FALSE)
 }
 remove(i, index)
+```
 
+## 5mc
+***
+
+```{r 5mc}
 # 5mc ====
-## Create sample sheet list
-sampleSheetDf <- sampleSheet5mc
+subset <- "5mc"
+sampleSheetDf <- sampleSheet_list[[subset]]
 sampleSheetList <- list()
 for (i in 1:length(group_list)) {
   sampleSheet_subset <- sampleSheetDf |>
@@ -143,7 +208,7 @@ remove(i, index,sampleSheetDf, sampleSheet_subset)
 methylObjList <- list()
 for (i in 1:length(group_list)) {
   methylObj <- methylKit::methRead(as.list(sampleSheetList[[i]]$fpath),sample.id = as.list(sampleSheetList[[i]]$index), 
-                                   treatment =  c(1, 0), sep = ",", 
+                                   treatment = c(1, 0), sep = ",", 
                                    pipeline=list(fraction=FALSE,chr.col=1,start.col=2,end.col=3,
                                                  strand.col=4, coverage.col=5,freqC.col=8), 
                                    assembly="mm10")
@@ -153,6 +218,7 @@ for (i in 1:length(group_list)) {
 remove(i, index, methylObj)
 
 ## Get DMR
+## A long process
 dmrObjList <- list()
 for (i in 1:length(group_list)) {
   index <- as.character(group_list[[i]])
@@ -161,11 +227,22 @@ for (i in 1:length(group_list)) {
 }
 remove(i, index, meth)
 
-## Save into files
+## Save into files ====
 for (i in 1:length(group_list)) {
   index <- as.character(group_list[[i]])
-  write.csv(dmrObjList[[index]], file.path(outputTmpDir, paste0("DMR_5mc_", YEAR, "_", TISSUE, "_", index, ".csv")), row.names = FALSE, quote = FALSE)
+  write.csv(dmrObjList[[index]], file.path(outputDir, "DMR", paste0("DMR_", subset, "_",YEAR, "_", TISSUE, "_", index, ".csv")), row.names = FALSE, quote = FALSE)
 }
 remove(i, index)
+```
 
-
+# Annotation
+```{r annotation}
+pattern = paste0("*_", YEAR, "_*")
+dmr_list <- list.files(file.path(outputDir, "DMR"), pattern = pattern)
+for (file in dmr_list) {
+  f <- annotateDMR(
+  input = file.path(outputDir, "DMR", file),
+  col_names = c("chr", "start", "end", "strand"),
+  output = NULL)
+}
+```

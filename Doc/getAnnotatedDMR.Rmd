@@ -58,18 +58,32 @@ outputDirAnnotated <- here::here("Results", "Statistics", "DMR_annotated")
 ```
 
 
-# Load and arrange the data
-## Sample file
+# Get differentially-methylated region (DMR) data
 ***
-Read sample file.
+For each tissue and each methylation type, we compare samples from germ-free (GF) vs specific-pathogen-free (SPF) conditions. 5mc stands for 5'-methylcytosine, 5hmc stands for 5'-hydroxylmethylcotosine, and 5mc_5hmc (or total) stands for 5mc + 5hmc.
+
+## 5mc
+***
+
 
 ```{r sample_file}
-sampleSheet <- read.csv(file.path(inputTmpDir, paste0("RRBS_", YEAR, "_", TISSUE, "_sampleSheet_",".csv")))
+## Check getDMR_2018.R
+## Check getDMR_2022.R
+
+## 5mc
+sampleSheet <- data.frame(fname = list.files(inputDir5mc))
+
+sampleSheet <- sampleSheet |>
+  tidyr::separate(fname, c("tissue", "microbiome", "age", "ox", "replicate", "methylation", "format"), sep = "_|\\.")
+
+## build getDMR.R
+
+sampleSheet <- read.csv(file.path(sampleSheetDir, paste0("RRBS", YEAR,".csv")))
 sampleSheet  <- sampleSheet [,2:ncol(sampleSheet)]
 
 sampleSheetTotal <- sampleSheet |>
   dplyr::filter(OX == "-") |>
-  dplyr::mutate(fpath = file.path(outputTmpDir,paste0(paste0(index,"_total.csv"))))
+  dplyr::mutate(fpath = file.path(inputDirTotal,paste0(paste0(index,"_total.csv"))))
 
 sampleSheet5hmc <- sampleSheet |>
   dplyr::filter(OX == "+") |>

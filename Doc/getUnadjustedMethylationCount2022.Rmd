@@ -32,6 +32,14 @@ library(here)
 library(stringr)
 ```
 
+## Set global variable
+***
+Set global variable.
+
+```{r GLOBAL}
+YEAR <- 2022
+```
+
 ## Set dir
 ***
 Set input and output dir.
@@ -42,13 +50,6 @@ inputDir <- here::here("Preprocessed", "RRBS", paste0("cpg", "_", YEAR))
 outputStatisticsDir <- here::here("Results", "Statistics")
 outputTmpDir <- here::here("Results", "Tmp")
 outputFiguresDir <- here::here("Results", "Figures")
-```
-
-## Set global variable
-***
-Set global variable
-```{r GLOBAL}
-YEAR <- 2022
 ```
 
 # Load and arrange the data
