@@ -1,0 +1,13 @@
+INFO [2024-06-20 20:27:20] $x
+INFO [2024-06-20 20:27:20] list(filtered_aging_gene_list[["SI"]]$SYMBOL, filtered_aging_gene_list[["LI"]]$SYMBOL, 
+INFO [2024-06-20 20:27:20]     filtered_aging_gene_list[["Ce"]]$SYMBOL)
+INFO [2024-06-20 20:27:20] 
+INFO [2024-06-20 20:27:20] $category.names
+INFO [2024-06-20 20:27:20] c("SI", "LI", "Ce")
+INFO [2024-06-20 20:27:20] 
+INFO [2024-06-20 20:27:20] $filename
+INFO [2024-06-20 20:27:20] [1] "venn_aging_responsive_gene.png"
+INFO [2024-06-20 20:27:20] 
+INFO [2024-06-20 20:27:20] $output
+INFO [2024-06-20 20:27:20] [1] TRUE
+INFO [2024-06-20 20:27:20] 

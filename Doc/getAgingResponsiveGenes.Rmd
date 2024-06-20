@@ -1,0 +1,302 @@
+---
+title: "Figures for RNAseq"
+output: html_document
+date: "2024-06-19"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Library and functions
+***
+
+```{r library}
+library(TxDb.Mmusculus.UCSC.mm10.knownGene)
+txdb <- TxDb.Mmusculus.UCSC.mm10.knownGene
+
+## Get keys for each dataset, key is the transcript name (TXNAME)
+## Note: select methods will be masked if dplyr is run somewhere
+k <- keys(txdb, keytype = "TXNAME")
+tx2gene <- select(txdb, k, "GENEID", "TXNAME")
+tx2gene <- tx2gene[!is.na(tx2gene$GENEID), ]
+
+## packages for import salmon data
+library(tximport)
+
+## import a package for querying SQLite-based annotation data packages
+library(AnnotationDbi)
+
+## Link Entrez GeneID to Gene Symbol
+library(org.Mm.eg.db)
+
+## import packages for differential expression analysis
+library(DESeq2)
+
+## Plot
+library(ggplot2)
+
+## pathyway analysis
+library(fgsea)
+hallmark.pathways <- gmtPathways(here::here("./gmt/mh.all.v2023.2.Mm.entrez.gmt"))
+
+## Venn
+library(VennDiagram)
+
+## UpSet
+library(UpSetR)
+
+## plot
+library(ggplot2)
+
+## Functions
+devtools::load_all()
+```
+
+# Set up the dir
+***
+
+```{r dir}
+tpmDir <- here::here("./Results/Statistics/TPM/")
+agingDir <- here::here("./Results/Statistics/AgingGenes_annotated/")
+figureDir <- here::here("Results/Figures/")
+```
+
+# TODO
+***
+
+```{r todo}
+# Run bash
+```
+
+# sample sheet
+***
+
+```{r sample_sheet}
+sampleSheet <- read.csv(here::here("./Doc/sampleSheet/RNAseq.csv"))
+
+# Arrange the sample sheet
+
+# assign file path
+sampleSheet$fpath <- paste(here::here("./Results/Preprocessed/RNAseq/", sampleSheet$Code, "salmon_quant", "quant.sf"))
+
+# sample name
+sampleSheet$sample <- paste(sampleSheet$Organ, sampleSheet$GF.SPF, sampleSheet$Weeks, sampleSheet$Replicate, sep = "_")
+```
+
+# Get count matrix
+***
+We first read TPM data from salmon output and save the counts.
+
+```{r salmon, eval=FALSE}
+# Check files exist
+file.exists(sampleSheet$fpath)
+
+# This package summarize the transcripts into genes
+txi.tx <- tximport(sampleSheet$fpath, type = "salmon", tx2gene = tx2gene)
+
+# Read the count and annotate it
+count <- as.data.frame(txi.tx$counts)
+colnames(count) <- sampleSheet$sample
+
+# Save count
+write.csv(count, here::here(tpmDir, "TPM_all_organ_all_age.csv"), row.names = FALSE)
+
+remove(txi.tx, count)
+```
+
+# Naturally aging-responsive genes
+
+## Identifying the aging-responsive gene list in each tissue
+***
+We used a typical GLM method to identify naturally aging-responsive genes in each tissue. The definition of naturally aging-response are genes with a continuous decreased / increased expression changes throughout the aging process in SPF mice.
+
+```{r natural_aging_gene}
+aging_gene_list <- list()
+for (tissue in c("SI", "LI", "Ce")) {
+  sampleSheet_subset <- sampleSheet |>
+    dplyr::filter(GF.SPF == "SPF") |> 
+    dplyr::filter(Organ == !!tissue)
+  
+  txi.tx <- tximport(sampleSheet_subset$fpath, type = "salmon", tx2gene = tx2gene)
+  
+  count <- as.data.frame(txi.tx$counts)
+  colnames(count) <- sampleSheet_subset$sample
+  
+  ## Get the fitted result
+  fitted_result <- getFittedResultByOneFactor(count = count,
+                                              sample_sheet = sampleSheet_subset,
+                                              sample_col = "sample",
+                                              condition_col = "Weeks")
+  
+  fitted_result_annotated <- annotateGENEID(fitted_result, org.Mm.eg.db)
+  
+  aging_gene_list[[tissue]] <- fitted_result_annotated
+  
+  ## Save data
+  write.csv(fitted_result_annotated, here::here(agingDir, paste0(tissue, ".csv")))
+}
+
+```
+
+## Overview
+***
+Let's have a look for the overview aging-responsive genes
+
+```{r aging_gene_overview}
+filtered_aging_gene_list <- list()
+for (tissue in c("SI", "LI", "Ce")) {
+  filtered_aging_gene_list[[tissue]] <- aging_gene_list[[tissue]] |>
+    dplyr::filter(!is.na(SYMBOL)) |>
+    dplyr::filter(adjPValue < 0.05) 
+}
+
+all_aging_responsive_gene <- union(filtered_aging_gene_list[["SI"]]$SYMBOL,
+                                   union(filtered_aging_gene_list[["LI"]]$SYMBOL,
+                                        filtered_aging_gene_list[["Ce"]]$SYMBOL))
+
+overlapped_aging_responsive_gene <- intersect(filtered_aging_gene_list[["SI"]]$SYMBOL,
+                              intersect(filtered_aging_gene_list[["LI"]]$SYMBOL,
+                                        filtered_aging_gene_list[["Ce"]]$SYMBOL))
+
+## Aging-responsive genes in at least one tissue
+## Venn diagram
+venn.diagram(
+  x = list(filtered_aging_gene_list[["SI"]]$SYMBOL, 
+           filtered_aging_gene_list[["LI"]]$SYMBOL, 
+           filtered_aging_gene_list[["Ce"]]$SYMBOL),
+  category.names = c("SI" , "LI" , "Ce"),
+  filename = here::here(figureDir, 'venn_aging_responsive_gene.png'),
+  output=TRUE
+)
+
+# UpSet
+input_upset <- c(SI = 178,
+                 LI = 3296,
+                 Ce = 353,
+                 "SI&LI" = 66,
+                 "SI&Ce" = 24,
+                 "LI&Ce" = 163,
+                 "SI&LI&Ce" = 17)
+
+upset(fromExpression(input_upset), 
+      nintersects = 40, 
+      nsets = 6, 
+      order.by = "freq", 
+      decreasing = T, 
+      mb.ratio = c(0.6, 0.4),
+      number.angles = 0, 
+      text.scale = 1.1, 
+      point.size = 2.8, 
+      line.size = 1
+      )
+
+## Compare with the pre-built aging-associate genes in human (From Pubmed db)
+## Read the prebuilt aging gene list
+pubmed_aging_responsive_genes <- read.csv(here::here(agingDir, "Aging_Premature.csv"))
+
+pubmed_aging_responsive_genes <- pubmed_aging_responsive_genes |>
+  tidyr::separate(Target, c("unwanted", "SYMBOL"), sep = "_")
+
+pubmed_aging_responsive_genes$SYMBOL <- stringr::str_to_title(stringr::str_to_lower(pubmed_aging_responsive_genes$SYMBOL))
+
+aging_responsive_genes_overlapped_pubmed <- list()
+for (tissue in c("SI", "LI", "Ce")) {
+  aging_responsive_genes_overlapped_pubmed[[tissue]] <- 
+    intersect(pubmed_aging_responsive_genes$SYMBOL, filtered_aging_gene_list[[tissue]]$SYMBOL)
+}
+  
+```
+
+## Further analysis between tissues
+### Summary
+***
+We first check how many aging-responsive genes in each tissue.
+
+```{r tissue_aging_genes}
+# Summary
+beta_df <- data.frame(matrix(ncol = 5, nrow = 0))
+colnames(beta_df) <- c("Tissue", "Trend", "beta", "SYMBOL")
+for (tissue in c("SI", "LI", "Ce")) {
+  tmp_df <- aging_gene_list[[tissue]] |>
+    dplyr::filter(!is.na(pValue)) |>
+    dplyr::filter(adjPValue < 0.05) |>
+    dplyr::mutate(Tissue = !!tissue) |>
+    dplyr::mutate(Trend = ifelse(beta > 0, "increased", "decreased")) |>
+    dplyr::mutate(Tissue_Trend = paste0(Tissue, "_", Trend)) |>
+    dplyr::select(Tissue, Trend, Tissue_Trend, beta, SYMBOL)
+  beta_df <- rbind(beta_df, tmp_df)
+}
+
+summary_df <- beta_df |>
+  dplyr::group_by(Tissue, Trend) |>
+  dplyr::summarise(N_genes = dplyr::n(),
+                   Median_beta = 10^(median(beta)))
+
+# Plot
+p <- ggplot(beta_df, aes(x=Tissue_Trend, y=10^beta)) + 
+  geom_boxplot() +
+  theme_classic()
+p
+```
+
+# Perform FGSEA analysis for LI-specific aging-responsive genes
+***
+
+```{r fgsea}
+beta_df_arranged <- beta_df |>
+  dplyr::filter(Tissue == "LI") |>
+  dplyr::arrange(desc(beta))
+
+ranks <- unlist(beta_df_arranged$beta)
+names(ranks) <- rownames(beta_df_arranged)
+
+## Run 1000 simulation
+
+fgseaRes <- fgsea(pathways=hallmark.pathways, stats=ranks, nperm=1000)
+
+fgseaResTidy <- fgseaRes |>
+  dplyr::arrange(desc(NES)) |> 
+  dplyr::select(-leadingEdge, -ES, -nMoreExtreme) |>
+  dplyr::arrange(padj)
+
+fgseaResTidy
+
+ggplot(fgseaResTidy, aes(reorder(pathway, NES), NES)) +
+  geom_col(aes(fill=padj<0.05)) +
+  coord_flip() +
+  labs(x="Pathway", y="Normalized Enrichment Score",
+       title="Hallmark pathways NES from GSEA") + 
+  theme_minimal()
+
+```
+
+# DEA
+***
+
+```{r dea}
+ddsTxi <- DESeqDataSetFromTximport(txi.tx, colData = sampleSheet, 
+                                   design = ~ GF.SPF + Weeks + Organ + GF.SPF*Weeks)
+dds <- DESeq(ddsTxi)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
