@@ -1,0 +1,444 @@
+---
+title: "Analysis for differentially-expressed genes, GF vs SPF"
+output: html_document
+date: "2024-06-22"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Library and functions
+***
+
+```{r library}
+library(TxDb.Mmusculus.UCSC.mm10.knownGene)
+txdb <- TxDb.Mmusculus.UCSC.mm10.knownGene
+
+## Get keys for each dataset, key is the transcript name (TXNAME)
+## Note: select methods will be masked if dplyr is run somewhere
+k <- keys(txdb, keytype = "TXNAME")
+tx2gene <- select(txdb, k, "GENEID", "TXNAME")
+tx2gene <- tx2gene[!is.na(tx2gene$GENEID), ]
+
+## packages for import salmon data
+library(tximport)
+
+## import a package for querying SQLite-based annotation data packages
+library(AnnotationDbi)
+
+## Link Entrez GeneID to Gene Symbol
+library(org.Mm.eg.db)
+
+## import packages for differential expression analysis
+library(DESeq2)
+
+## Plot
+library(ggplot2)
+library(pheatmap)
+library(ggfortify)
+
+## pathyway analysis
+library(fgsea)
+hallmark.pathways <- gmtPathways(here::here("./gmt/mh.all.v2023.2.Mm.entrez.gmt"))
+
+## Venn
+library(VennDiagram)
+
+## UpSet
+library(UpSetR)
+
+## Functions
+devtools::load_all()
+```
+
+# Set up the dir
+***
+
+```{r dir}
+tpmDir <- here::here("./Results/Statistics/TPM/")
+degDir <- here::here("./Results/Statistics/DEG/")
+figureDir <- here::here("Results/Figures/")
+```
+
+# TODO
+***
+
+```{r todo}
+# Run bash
+```
+
+# sample sheet
+***
+
+```{r sample_sheet}
+sampleSheet <- read.csv(here::here("./Doc/sampleSheet/RNAseq.csv"))
+
+# Arrange the sample sheet
+# assign file path
+sampleSheet$fpath <- paste(here::here("./Results/Preprocessed/RNAseq/", sampleSheet$Code, "salmon_quant", "quant.sf"))
+
+# new variable
+sampleSheet <- sampleSheet |>
+  dplyr::mutate(GF.SPF_Weeks = paste0(GF.SPF, "_", Weeks),
+                Organ_GF.SPF = paste0(Organ, "_", GF.SPF),
+                Weeks.factor = factor(Weeks))
+
+# sample name
+sampleSheet$sample <- paste(sampleSheet$Organ, sampleSheet$GF.SPF, sampleSheet$Weeks, sampleSheet$Replicate, sep = "_")
+```
+
+# Get count matrix
+***
+We first read TPM data from salmon output and save the counts.
+
+```{r salmon, eval=FALSE}
+# Check files exist
+file.exists(sampleSheet$fpath)
+
+# This package summarize the transcripts into genes
+txi.tx <- tximport(sampleSheet$fpath, type = "salmon", tx2gene = tx2gene)
+
+# Read the count and annotate it
+count <- as.data.frame(txi.tx$counts)
+colnames(count) <- sampleSheet$sample
+
+# Save count
+write.csv(count, here::here(tpmDir, "TPM_all_organ_all_age.csv"), row.names = FALSE)
+
+remove(txi.tx, count)
+```
+
+# Overview
+***
+
+## Count
+
+```{r count}
+count <- read.csv(here::here(tpmDir, "TPM_all_organ_all_age.csv"))
+```
+
+## Correlation matrix
+```{r cor}
+mtx <- cor(count, method = "spearman")
+annot_col <- data.frame(row.names = sampleSheet$sample,
+                       GF.SPF_Weeks = sampleSheet$GF.SPF_Weeks,
+                       Organ = sampleSheet$Organ)
+p.cor <- pheatmap(mtx,fontsize = 4,annotation_col = annot_col,
+                  scale="row",
+                  clustering_distance_cols = as.dist(1 - mtx),clustering_distance_rows = as.dist(1 - mtx))
+# cannot directly save the pheatmap object to pdf
+savePheatmapPdf(p.cor, here::here(figureDir, "correlation_matrix.pdf"))
+p.cor
+
+```
+
+## PCA
+***
+We first performed PCA analysis for our samples. The variance between samples are more clear if counts are normalized by vst method.  
+
+```{r pca}
+# Read all transcripts for pca
+# This package summarize the transcripts into genes
+# The design here is not import
+txi.tx <- tximport(sampleSheet$fpath, type = "salmon", tx2gene = tx2gene)
+dds <- DESeqDataSetFromTximport(txi.tx,colData = sampleSheet, design = ~ GF.SPF)
+vsd <- vst(dds,blind = FALSE)
+vstTPM <- as.data.frame(assay(vsd))
+colnames(vstTPM) <- sampleSheet$sample
+
+# Save the vst TPM
+write.csv(tpmDir, "vstTPM_all_organ_all_Age.csv", row.names = FALSE)
+
+pca <- prcomp(t(vstTPM))
+PC <- c(1,2)
+p <- autoplot(pca, data = sampleSheet, x = PC[1], y = PC[2], 
+                          colour = "Weeks.factor",
+                          shape = "Organ_GF.SPF", size = 4, label = T, label.size = 0,
+                          label.repel=F, 
+                          main = "PCA all") + 
+  theme(panel.background = element_rect(fill = "white", colour = "black"),
+        panel.grid.major = element_blank(),panel.grid.minor = element_blank())+
+  scale_shape_manual(values=c(0,15,1,16,2,17)) + scale_colour_manual(values = c("red", "blue", "green"))
+
+ggsave(here::here(figureDir, "pca_all.pdf"),plot=p)
+p
+
+remove(txi.tx, dds, vsd, vstTPM, pca, PC, p)
+```
+
+# Differential expression analysis
+
+## Differentially-expressed genes (DEG)
+***
+We used DESeq2 to perform differential expression analysis between GF and SPF samples at each age. The definition of differentially-expressed genes are genes with significant changes in GF vs SPF samples (log2FC > 1 or < -1, padj < 0.05).
+
+```{r deg}
+deg_list <- list()
+deg_filtered_list <- list()
+for (tissue in c("SI", "Ce", "LI")) {
+  for (week in c(3, 17, 78)) {
+    sampleSheet_subset <- sampleSheet |>
+      dplyr::filter(Organ == !!tissue) |>
+      dplyr::filter(Weeks == !!week)
+    
+    txi.tx <- tximport(sampleSheet_subset$fpath, type = "salmon", tx2gene = tx2gene)
+    ddsTxi <- DESeqDataSetFromTximport(txi.tx,
+                                       colData = sampleSheet_subset,
+                                       design = ~ GF.SPF)
+    
+    dds <- DESeq(ddsTxi)
+    
+    # Get the results
+    res <- results(dds, contrast=c("GF.SPF","GF","SPF"))
+    res_annotated <- annotateGENEID(res, org.Mm.eg.db)
+    
+    # Save it to a list
+    condition <- paste0(tissue, "_", week)
+    deg_list[[condition]] <- res_annotated
+    deg_filtered_list[[condition]] <- res_annotated |>
+      dplyr::filter(padj < 0.05) |>
+      dplyr::filter(abs(log2FoldChange) > 1) |>
+      dplyr::filter(!is.na(SYMBOL))
+    
+    # Save the final data frame
+    write.csv(res_annotated, here::here(degDir, paste0("DEA_", condition, ".csv")), row.names = FALSE)
+  }
+}
+
+```
+
+## Overview of DEG
+***
+Let's have a look for the overview analysis of DEGs.
+
+```{r deg_overview}
+deg_df <- matrix(ncol=5, nrow=0)
+colnames(deg_df) <- c("sample", "Tissue", "Weeks", "direction", "num_deg")
+
+# Create a number of DEGs for each tissue ====
+for (i in 1:length(deg_filtered_list)) {
+  sample <- names(deg_filtered_list[i])
+  condition <- unlist(strsplit(names(deg_filtered_list[i]), "_"))
+  
+  # Get the numbers of DEGs
+  num_up_deg <- deg_filtered_list[[i]] |>
+    dplyr::filter(log2FoldChange > 0) |>
+    nrow()
+  
+  num_down_deg <- deg_filtered_list[[i]] |>
+    dplyr::filter(log2FoldChange < 0) |>
+    nrow()
+  
+  tmp_df <- data.frame(sample =  c(sample, sample),
+                       Tissue = c(condition[1], condition[1]),
+                       Weeks = c(condition[2], condition[2]),
+                       direction =c("up", "down"),
+                       num_deg = c(num_up_deg, num_down_deg))
+  
+  deg_df <- rbind(deg_df, tmp_df)
+}
+remove(tmp_df, i)
+
+# Annotation of heatmap
+annot_col <- data.frame(row.names = sampleSheet$sample,
+                        GF.SPF_Weeks = sampleSheet$GF.SPF_Weeks,
+                        Organ = sampleSheet$Organ)
+# upregulated genes
+# Generate matrix and make figures
+deg_df_subset <- deg_df |> 
+  dplyr::filter(direction == "up") |> 
+  dplyr::select(Tissue, Weeks, num_deg)
+deg_mtx <- reshape(deg_df_subset, idvar = "Tissue", timevar = "Weeks", direction = "wide")
+deg_mtx <- as.matrix(deg_mtx[,2:ncol(deg_mtx)])
+colnames(deg_mtx) <- c(3, 17, 78)
+rownames(deg_mtx) <- c("SI", "Ce", "LI")
+
+p <- pheatmap(deg_mtx,fontsize = 4,
+              colorRampPalette(c("white","red"))(100),
+              cluster_cols=FALSE, cluster_rows=FALSE,scale="row")
+# cannot directly save the pheatmap object to pdf
+savePheatmapPdf(p, here::here(figureDir, "num_up_deg_heatmap.pdf"))
+p
+
+# downregulated genes
+# Generate matrix and make figures
+deg_df_subset <- deg_df |> 
+  dplyr::filter(direction == "down") |> 
+  dplyr::select(Tissue, Weeks, num_deg)
+deg_mtx <- reshape(deg_df_subset, idvar = "Tissue", timevar = "Weeks", direction = "wide")
+deg_mtx <- as.matrix(deg_mtx[,2:ncol(deg_mtx)])
+colnames(deg_mtx) <- c(3, 17, 78)
+rownames(deg_mtx) <- c("SI", "Ce", "LI")
+
+p <- pheatmap(deg_mtx,fontsize = 4,
+              colorRampPalette(c("white","blue"))(100),
+              cluster_cols=FALSE, cluster_rows=FALSE,scale="row")
+# cannot directly save the pheatmap object to pdf
+savePheatmapPdf(p, here::here(figureDir, "num_down_deg_heatmap.pdf"))
+p
+
+# Get the union DEG list ====
+union_deg_list <- list()
+for (i in 1:(length(deg_filtered_list)-1)) {
+  tmp_deg_list <- union(deg_filtered_list[[i]]$SYMBOL,
+                        deg_filtered_list[[i+1]]$SYMBOL)
+  union_deg_list <- union(union_deg_list, tmp_deg_list)
+}
+
+# Get the intersect DEG list ====
+intersect_deg_list <- list()
+for (i in 1:(length(deg_filtered_list)-1)) {
+  tmp_deg_list <- intersect(deg_filtered_list[[i]]$SYMBOL,
+                            deg_filtered_list[[i+1]]$SYMBOL)
+  intersect_deg_list <- intersect(intersect_deg_list, tmp_deg_list)
+}
+
+# Venn plot ====
+# Microbiota-associated DEGs in each tissue
+## All
+for (tissue in c("SI", "Ce", "LI")) {
+  set1 <- paste0(tissue, "_", 3)
+  set2 <- paste0(tissue, "_", 17)
+  set3 <- paste0(tissue, "_", 78)
+  venn.diagram(
+    x = list(deg_filtered_list[[set1]]$SYMBOL, 
+             deg_filtered_list[[set2]]$SYMBOL, 
+             deg_filtered_list[[set3]]$SYMBOL),
+    category.names = c("3" , "17" , "78"),
+    filename = here::here(figureDir, paste0(tissue, '_venn_microbiota_DEG.png')),
+    output=TRUE
+  )
+}
+
+for (tissue in c("SI", "Ce", "LI")) {
+  set1 <- paste0(tissue, "_", 3)
+  set2 <- paste0(tissue, "_", 17)
+  set3 <- paste0(tissue, "_", 78)
+  
+  set1_df <-  deg_filtered_list[[set1]] |>
+    dplyr::filter(log2FoldChange > 0) |>
+    dplyr::select(SYMBOL)
+  
+  set2_df <-  deg_filtered_list[[set2]] |>
+    dplyr::filter(log2FoldChange > 0) |>
+    dplyr::select(SYMBOL)
+  
+  set3_df <-  deg_filtered_list[[set3]] |>
+    dplyr::filter(log2FoldChange > 0) |>
+    dplyr::select(SYMBOL)
+  venn.diagram(
+    x = list(na.omit(set1_df$SYMBOL), 
+             na.omit(set2_df$SYMBOL), 
+             na.omit(set3_df$SYMBOL)),
+    category.names = c("3" , "17" , "78"),
+    filename = here::here(figureDir, paste0(tissue, '_venn_microbiota_up_DEG.png')),
+    output=TRUE
+  )
+}
+
+for (tissue in c("SI", "Ce", "LI")) {
+  set1 <- paste0(tissue, "_", 3)
+  set2 <- paste0(tissue, "_", 17)
+  set3 <- paste0(tissue, "_", 78)
+  
+  set1_df <-  deg_filtered_list[[set1]] |>
+    dplyr::filter(log2FoldChange < 0) |>
+    dplyr::select(SYMBOL)
+  
+  set2_df <-  deg_filtered_list[[set2]] |>
+    dplyr::filter(log2FoldChange < 0) |>
+    dplyr::select(SYMBOL)
+  
+  set3_df <-  deg_filtered_list[[set3]] |>
+    dplyr::filter(log2FoldChange < 0) |>
+    dplyr::select(SYMBOL)
+  venn.diagram(
+    x = list(na.omit(set1_df$SYMBOL), 
+             na.omit(set2_df$SYMBOL), 
+             na.omit(set3_df$SYMBOL)),
+    category.names = c("3" , "17" , "78"),
+    filename = here::here(figureDir, paste0(tissue, '_venn_microbiota_down_DEG.png')),
+    output=TRUE
+  )
+}
+
+```
+
+## Upset plot and pathway analysis
+***
+Similar as overlapping analysis, we draw upset plot based on overlapping analysis result and also perform the pathway enrichment analysis for the major subset.
+
+```{r upset}
+gene_sets <- list()
+for (i in 1:length(deg_filtered_list)) {
+  condition <- names(deg_filtered_list[i])
+  gene_sets[[condition]] <- unlist(deg_filtered_list[[i]]$SYMBOL)
+}
+
+library(reshape2)
+all_genes <- unique(unlist(gene_sets))
+binary_matrix <- sapply(gene_sets, function(x) as.integer(all_genes %in% x))
+colnames(binary_matrix) <- names(gene_sets)
+rownames(binary_matrix) <- all_genes
+binary_matrix <- as.data.frame(binary_matrix)
+
+p <- upset(binary_matrix, sets = names(gene_sets), 
+      order.by = "freq", 
+      main.bar.color = "blue", 
+      sets.bar.color = "red",
+      sets.x.label = "Gene Sets",
+      text.scale = c(2, 1.5, 1, 1, 1.5, 1.2))
+p
+pdf(here::here(figureDir, "upset_all.pdf"), height = 6, width = 6.5)
+print(p) # use print here
+dev.off()
+```
+
+***
+Calculate how many DEGs were shared by at least two tissu-aging samples.
+
+```{r overlapped_two}
+binary_matrix <- cbind(binary_matrix, data.frame(sum = rowSums(binary_matrix)))
+deg_two_overlapped <- binary_matrix |> 
+  dplyr::filter(sum == 2)
+
+```
+
+***
+Pathway analysis for the overlapped gene set: LI and Ce at 78 weeks.
+
+```{r pathway_upset1}
+highest_deg_df <- data.frame(matrix(ncol=1, nrow=0))
+colnames(highest_deg_df) <- c("SYMBOL")
+for (i in 1:nrow(binary_matrix)) {
+  if (binary_matrix[i,]$Ce_78 == 0 && binary_matrix[i,]$LI_78 == 0) {
+    tmp_df <- data.frame(SYMBOL = rownames(binary_matrix[i,]))
+    highest_deg_df <- rbind(highest_deg_df, tmp_df)
+  }
+}
+write.csv(highest_deg_df, here::here(degDir, "overlapped_deg_Ce_LI_78.csv"),
+          row.names = FALSE)
+
+## Subject for enrichR
+```
+
+***
+Pathway analysis for the overlapped gene set: Ce at 17 and 78 weeks.
+
+```{r pathway_upset2}
+highest_deg_df <- data.frame(matrix(ncol=1, nrow=0))
+colnames(highest_deg_df) <- c("SYMBOL")
+for (i in 1:nrow(binary_matrix)) {
+  if (binary_matrix[i,]$Ce_17 == 0 && binary_matrix[i,]$Ce_78 == 0) {
+    tmp_df <- data.frame(SYMBOL = rownames(binary_matrix[i,]))
+    highest_deg_df <- rbind(highest_deg_df, tmp_df)
+  }
+}
+write.csv(highest_deg_df, here::here(degDir, "overlapped_deg_Ce_17_78.csv"),
+          row.names = FALSE)
+
+## Subject for enrichR
+```
+
