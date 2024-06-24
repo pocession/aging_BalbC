@@ -4,13 +4,16 @@
 \alias{annotateDMR}
 \title{annotateDMR}
 \usage{
-annotateDMR(input, col_names, output = NULL)
+annotateDMR(input, col_names, annots, output = NULL)
 }
 \arguments{
 \item{input}{a character string specifying the name and path of the input file (.csv)}
 
 \item{col_names}{a character vector specifying the column names of choromosome, starting position, ending position
 Should be in this format: c(chr, start, end, strand)}
+
+\item{annots}{a character vector speicyfing the annoation type
+Should be in this format: c("mm10_cpg_islands", "mm10_cpg_shores","mm10_cpg_shelves", "mm10_cpg_inter")}
 
 \item{output}{A character string specifying the name and path of output file
 the default path is as same as the input file
@@ -27,6 +30,7 @@ This function reads differentially-methylated regions (DMRs) and annotate with h
 df <- annotateDMR(
 input = here::here("./Results/Statistics/DMR/DMR_5hmc_2018_SI_3.csv"),
 col_names = c("chr", "start", "end", "strand"),
+annots = c("mm10_cpg_islands", "mm10_cpg_shores","mm10_cpg_shelves", "mm10_cpg_inter"),
 output = NULL
 )
 }
