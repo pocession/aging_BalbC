@@ -8,6 +8,8 @@
 #' @param input a character string specifying the name and path of the input file (.csv)
 #' @param col_names a character vector specifying the column names of choromosome, starting position, ending position
 #' Should be in this format: c(chr, start, end, strand)
+#' @param annots a character vector speicyfing the annoation type
+#' Should be in this format: c("mm10_cpg_islands", "mm10_cpg_shores","mm10_cpg_shelves", "mm10_cpg_inter")
 #' @param output A character string specifying the name and path of output file
 #' the default path is as same as the input file
 #' the default output file name is the input file name prefixed with "annotated_"
@@ -20,12 +22,14 @@
 #' @importFrom dplyr select filter left_join
 #' @importFrom annotatr annotate_regions build_annotations
 #' @importFrom GenomicRanges GRanges
+#' @importFrom TxDb TxDb.Mmusculus.UCSC.mm10.knownGene
 #'
 #' @examples
 #' \dontrun{
 #' df <- annotateDMR(
 #' input = here::here("./Results/Statistics/DMR/DMR_5hmc_2018_SI_3.csv"),
 #' col_names = c("chr", "start", "end", "strand"),
+#' annots = c("mm10_cpg_islands", "mm10_cpg_shores","mm10_cpg_shelves", "mm10_cpg_inter"),
 #' output = NULL
 #' )
 #' }
@@ -33,7 +37,7 @@
 ## TODO
 ## Run getDMR2018.Rmd or getDMR2022.Rmd to get DMR data
 
-annotateDMR <- function(input, col_names, output = NULL) {
+annotateDMR <- function(input, col_names, annots, output = NULL) {
   # check input ----------------------------------------------------------------
   
   assertthat::assert_that(is.character(input), 
@@ -47,6 +51,9 @@ annotateDMR <- function(input, col_names, output = NULL) {
   
   assertthat::assert_that(length(col_names) == 4, 
                           msg = "There are not enough column numbers of the given argument 'col_names'.\n")
+  
+  assertthat::assert_that(length(annots) > 0, 
+                          msg = "There are not enough annotation types of the given argument 'annots'.\n")
   
   # check output ---------------------------------------------------------------
   
@@ -89,7 +96,7 @@ annotateDMR <- function(input, col_names, output = NULL) {
   
   # Get the annotated data frame -----------------------------------------------
   ## Get annotation
-  annotated_df <- .get_annotated_gr(input_df_pos, col_names)
+  annotated_df <- .get_annotated_gr(input_df_pos, col_names, annots)
   
   ## Get id and annotation information
   annotated_df_subset <- annotated_df |>
@@ -109,12 +116,14 @@ annotateDMR <- function(input, col_names, output = NULL) {
 #' .get_annotated_gr
 #'
 #' @description
-#' This function annotate differentially-interacted regions (DIRs) with given genome information
+#' This function annotate differentially-methylated regions (DMRs) with given genome information
 #' 
 #' @author Tsunghan Hsieh
 #'
 #' @param input a character string specifying the input dataframe
 #' @param col_names a character vector specifying the column names of return dataframe
+#' @param annots a character vector specifying the annotation type
+#' Should be in this format: c("mm10_cpg_islands", "mm10_cpg_shores","mm10_cpg_shelves", "mm10_cpg_inter")
 #' @return a dataframe of annotated file
 #' @examples
 #' \dontrun{
@@ -123,7 +132,7 @@ annotateDMR <- function(input, col_names, output = NULL) {
 #' col_names = col_names
 #' )
 #' }
-.get_annotated_gr <- function(df, col_names) {
+.get_annotated_gr <- function(df, col_names, annots) {
   
   # Check colnames -------------------------------------------------------------
   ## Filter out non-standard chr
@@ -145,10 +154,11 @@ annotateDMR <- function(input, col_names, output = NULL) {
   # Annotate -------------------------------------------------------------------
   ## Select annotations for intersection with regions
   ## Note inclusion of custom annotation, and use of shortcuts
-  annots <- c('hg38_basicgenes')
+  annots <- c("mm10_cpg_islands", "mm10_cpg_shores","mm10_cpg_shelves", "mm10_cpg_inter")
+  # annots <- c('mm10_basicgenes')
   
   ## Build the annotations (a single GRanges object)
-  annotations <- annotatr::build_annotations(genome = 'hg38', annotations = annots)
+  annotations <- annotatr::build_annotations(genome = 'mm10', annotations = annots)
   
   dm_annotated <- annotatr::annotate_regions(
     regions = gr,

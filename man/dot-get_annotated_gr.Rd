@@ -4,10 +4,13 @@
 \alias{.get_annotated_gr}
 \title{.get_annotated_gr}
 \usage{
-.get_annotated_gr(df, col_names)
+.get_annotated_gr(df, col_names, annots)
 }
 \arguments{
 \item{col_names}{a character vector specifying the column names of return dataframe}
+
+\item{annots}{a character vector specifying the annotation type
+Should be in this format: c("mm10_cpg_islands", "mm10_cpg_shores","mm10_cpg_shelves", "mm10_cpg_inter")}
 
 \item{input}{a character string specifying the input dataframe}
 }
@@ -15,7 +18,7 @@
 a dataframe of annotated file
 }
 \description{
-This function annotate differentially-interacted regions (DIRs) with given genome information
+This function annotate differentially-methylated regions (DMRs) with given genome information
 }
 \examples{
 \dontrun{

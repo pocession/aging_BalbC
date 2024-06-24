@@ -50,63 +50,13 @@ Set input and output dir.
 
 ```{r dir}
 sampleSheetDir <- here::here("Doc","sampleSheet")
-inputDir5mc <- here::here("Results", "Statistics", "5mc")
-inputDir5hmc <- here::here("Results", "Statistics", "5hmc")
-inputDirTotal <- here::here("Results", "Statistics", "5hmc_5mc")
-outputDir <- here::here("Results", "Statistics", "DMR")
-outputDirAnnotated <- here::here("Results", "Statistics", "DMR_annotated")
+dmrDir <- here::here("Results", "Statistics", "DMR")
+annotatedDmrDir <- here::here("Results", "Statistics", "DMR_annotated")
 ```
 
-
-# Get differentially-methylated region (DMR) data
+# TODO: Get DMR
 ***
-For each tissue and each methylation type, we compare samples from germ-free (GF) vs specific-pathogen-free (SPF) conditions. 5mc stands for 5'-methylcytosine, 5hmc stands for 5'-hydroxylmethylcotosine, and 5mc_5hmc (or total) stands for 5mc + 5hmc.
-
-## 5mc
-***
-
-
-```{r sample_file}
-## Check getDMR_2018.R
-## Check getDMR_2022.R
-
-## 5mc
-sampleSheet <- data.frame(fname = list.files(inputDir5mc))
-
-sampleSheet <- sampleSheet |>
-  tidyr::separate(fname, c("tissue", "microbiome", "age", "ox", "replicate", "methylation", "format"), sep = "_|\\.")
-
-## build getDMR.R
-
-sampleSheet <- read.csv(file.path(sampleSheetDir, paste0("RRBS", YEAR,".csv")))
-sampleSheet  <- sampleSheet [,2:ncol(sampleSheet)]
-
-sampleSheetTotal <- sampleSheet |>
-  dplyr::filter(OX == "-") |>
-  dplyr::mutate(fpath = file.path(inputDirTotal,paste0(paste0(index,"_total.csv"))))
-
-sampleSheet5hmc <- sampleSheet |>
-  dplyr::filter(OX == "+") |>
-  dplyr::mutate(fpath = file.path(outputTmpDir,paste0(paste0(index,"_5hmc.csv"))))
-
-sampleSheet5mc <- sampleSheet |>
-  dplyr::filter(OX == "+") |>
-  dplyr::mutate(fpath = file.path(outputTmpDir,paste0(paste0(index,"_5mc.csv"))))
-
-# Read methylation call list (tile = 100) ====
-tile <- readRDS(file.path(inputTmpDir, paste0("RRBS_", YEAR, "_", TISSUE, "_methTile100_", ".rds")))
-
-# Confirm the sample ID and sampleSheet
-sampleIdList <- getSampleID(tile)
-for (i in 1:length(sampleIdList)) {
-  if (sampleIdList[i] == sampleSheet[i,]$index)
-    print("TRUE")
-}
-```
-
-# Get DMR
-***
-Get DMR for 5hmc + 5mc, 5hmc, and 5mc.
+Get DMR for 5hmc + 5mc, 5hmc, and 5mc. For more information, check `./Doc/getDMR_2018.Rmd` and `getDMR_2022.Rmd`
 
 ```{r DMR}
 
@@ -115,11 +65,48 @@ Get DMR for 5hmc + 5mc, 5hmc, and 5mc.
 # Get annotated DMR
 Get annotated DMR for 5hmc + 5mc, 5hmc, and 5mc.
 ```{r annotated_DMR}
-dmrList <- list.files(outputDir)
+dmrList <- list.files(dmrDir)
+
+## Annotate CpG islands
 for (file in dmrList) {
+  outputfname <- sub(".*/([^.]+)\\.csv", "\\1", file)
+  outputfname <- paste0("cpg_annotated_", outputfname)
+  outputdir <- here::here("Results/Statistics/DMR_annotated/")
+  output <- here::here(outputdir, outputfname)
+  
   annotateDMR(
-    input = here::here(outputDir,file),
+    input = here::here(dmrDir,file),
     col_names = c("chr", "start", "end", "strand"),
-    output = NULL)
+    annots = c("mm10_cpg_islands", "mm10_cpg_shores","mm10_cpg_shelves", "mm10_cpg_inter"),
+    output = output)
 }
+
+## Annotate basic genes
+## Could be longer than CpG annotation
+for (file in dmrList) {
+  outputfname <- sub(".*/([^.]+)\\.csv", "\\1", file)
+  outputfname <- paste0("genes_annotated_", outputfname)
+  outputdir <- here::here("Results/Statistics/DMR_annotated/")
+  output <- here::here(outputdir, outputfname)
+  
+  annotateDMR(
+    input = here::here(dmrDir,file),
+    col_names = c("chr", "start", "end", "strand"),
+    annots = c("mm10_basicgenes"),
+    output = output)
+}
+```
+
+# Overview 
+***
+Some over analysis for the total dmr
+
+```{r overview_cpg}
+# Total number of DMR
+cpg_list <- list()
+for (file in list.files(annotatedDmrDir)) {
+  dmr_fname <- unlist(strsplit(file, "_"))
+}
+
+cpg_annotated_DMR_5hmc_2018_SI_3
 ```
