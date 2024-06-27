@@ -148,9 +148,14 @@ vsd <- vst(dds,blind = FALSE)
 vstTPM <- as.data.frame(assay(vsd))
 colnames(vstTPM) <- sampleSheet$sample
 
+## We can also use the un-normalized count matrix for pca
+## The result is not very conclusive
+# TPM <- as.data.frame(txi.tx$counts)
+# colnames(TPM) <- sampleSheet$sample
+# pca <- prcomp(t(TPM))
+
 # Save the vst TPM
 write.csv(tpmDir, "vstTPM_all_organ_all_Age.csv", row.names = FALSE)
-
 pca <- prcomp(t(vstTPM))
 PC <- c(1,2)
 p <- autoplot(pca, data = sampleSheet, x = PC[1], y = PC[2], 

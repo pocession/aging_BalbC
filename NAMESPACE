@@ -3,7 +3,6 @@
 export(annotateDMR)
 export(getFittedResultByOneFactor)
 importFrom(GenomicRanges,GRanges)
-importFrom(TxDb,TxDb.Mmusculus.UCSC.mm10.knownGene)
 importFrom(annotatr,annotate_regions)
 importFrom(annotatr,build_annotations)
 importFrom(assertthat,assert_that)
