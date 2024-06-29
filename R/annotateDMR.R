@@ -22,7 +22,6 @@
 #' @importFrom dplyr select filter left_join
 #' @importFrom annotatr annotate_regions build_annotations
 #' @importFrom GenomicRanges GRanges
-#' @importFrom TxDb TxDb.Mmusculus.UCSC.mm10.knownGene
 #'
 #' @examples
 #' \dontrun{

@@ -38,6 +38,7 @@ library(DESeq2)
 library(ggplot2)
 library(pheatmap)
 library(ggfortify)
+library(ggrepel)
 
 ## pathyway analysis
 library(fgsea)
@@ -148,9 +149,14 @@ vsd <- vst(dds,blind = FALSE)
 vstTPM <- as.data.frame(assay(vsd))
 colnames(vstTPM) <- sampleSheet$sample
 
+## We can also use the un-normalized count matrix for pca
+## The result is not very conclusive
+# TPM <- as.data.frame(txi.tx$counts)
+# colnames(TPM) <- sampleSheet$sample
+# pca <- prcomp(t(TPM))
+
 # Save the vst TPM
 write.csv(tpmDir, "vstTPM_all_organ_all_Age.csv", row.names = FALSE)
-
 pca <- prcomp(t(vstTPM))
 PC <- c(1,2)
 p <- autoplot(pca, data = sampleSheet, x = PC[1], y = PC[2], 
@@ -442,3 +448,39 @@ write.csv(highest_deg_df, here::here(degDir, "overlapped_deg_Ce_17_78.csv"),
 ## Subject for enrichR
 ```
 
+## Volcano plot
+***
+```{r deg_volcano_plot}
+
+## Read list
+deg_list <- list()
+for (tissue in c("SI", "Ce", "LI")) {
+  for (age in c(3, 17, 78)) {
+    index <- paste0("DEA_", tissue, "_", age)
+    fname <- paste0(index, ".csv")
+    df <- read.csv(here::here("./Results/Statistics/DEG", fname))
+    df$diffexpressed <- "NO"
+    df$diffexpressed[df$log2FoldChange > 1 & df$padj < 0.05] <- "UP"
+    df$diffexpressed[df$log2FoldChange < -1 & df$padj < 0.05] <- "DOWN"
+    df$delabel <- ifelse(df$SYMBOL %in% head(df[order(df$padj), "SYMBOL"], 20), df$SYMBOL, NA)
+    deg_list[[index]] <- df
+  }
+}
+
+## Plot
+for (i in 1:length(deg_list)) {
+  df <- deg_list[[i]]
+  index <- names(deg_list[i])
+  ggplot(data = df, aes(x = log2FoldChange, y = -log10(padj), col = diffexpressed, label = delabel)) +
+    geom_vline(xintercept = c(-1, 1), col = "gray", linetype = 'dashed') +
+    geom_hline(yintercept = -log10(0.05), col = "gray", linetype = 'dashed') + 
+    scale_color_manual(values = c("blue", "grey", "red"), 
+                       labels = c("Downregulated", "Not significant", "Upregulated")) +
+    geom_point() +
+    geom_text_repel(max.overlaps = Inf) 
+  ggsave(here::here("./Results/Figures", paste0(index, ".pdf")))
+}
+```
+
+## Microbiota x Aging 
+***

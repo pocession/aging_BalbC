@@ -50,8 +50,25 @@ Set input and output dir.
 
 ```{r dir}
 sampleSheetDir <- here::here("Doc","sampleSheet")
+methylCountDir <- here::here("Results", "Statistics")
 dmrDir <- here::here("Results", "Statistics", "DMR")
 annotatedDmrDir <- here::here("Results", "Statistics", "DMR_annotated")
+```
+
+# Sample Sheet
+***
+```{r sampleSheet}
+sampleSheet_SI <- read.csv(here::here(
+  sampleSheetDir, "RRBS_2018_SI_sampleSheet.csv"))
+sampleSheet_SI <- sampleSheet_SI[,2:ncol(sampleSheet_SI)]
+sampleSheet_SI <- sampleSheet_SI |>
+  dplyr::mutate(sample = paste0(Tissue, "_", Condition, "_", Age_w, "_", Replicate))
+
+sampleSheet_LI <- read.csv(here::here(
+  sampleSheetDir, "RRBS_2022_LI_sampleSheet.csv"))
+sampleSheet_LI <- sampleSheet_LI[,2:ncol(sampleSheet_LI)]
+sampleSheet_LI <- sampleSheet_LI |>
+  dplyr::mutate(sample = paste0(Tissue, "_", Condition, "_", Age_w, "_", Replicate))
 ```
 
 # TODO: Get DMR
@@ -59,12 +76,74 @@ annotatedDmrDir <- here::here("Results", "Statistics", "DMR_annotated")
 Get DMR for 5hmc + 5mc, 5hmc, and 5mc. For more information, check `./Doc/getDMR_2018.Rmd` and `getDMR_2022.Rmd`
 
 ```{r DMR}
-
+# Get DMR
 ```
 
-# Get annotated DMR
+# Methyl counts analysis
+## Get methyl counts
+***
+
+```{r methyl_count}
+# List all files in the folder with names containing "all"
+methyl_counts_file_list <- list.files(
+  path = here::here(methylCountDir, "5hmc_5mc"))
+methyl_counts_list <- list()
+for (file in methyl_counts_file_list) {
+  count_fname_index <- unlist(strsplit(file, "_"))
+  tissue <- count_fname_index[1]
+  condition <- count_fname_index[2]
+  weeks <- count_fname_index[3]
+  replicate <- count_fname_index[5]
+  
+  new_index <- paste0(tissue, "_", 
+                      condition, "_",
+                      weeks, "_",
+                      replicate)
+  df <- read.csv(here::here(methylCountDir, "5hmc_5mc", file))
+  df <- df |>
+    dplyr::mutate(pos_index = paste0(chr, "_", start, "_", end)) |>
+    dplyr::select(pos_index, freqC)
+  
+  colnames(df) <- c("pos_index", new_index)
+  
+  methyl_counts_list[[new_index]] <- df
+}
+```
+
+## Overview analysis
+***
+Count the union methylated regions.
+
+```{r methylcount_overview}
+union_list <- list()
+for (i in 1:(length(methyl_counts_list)-1)) {
+  union_list <- union(union_list,
+                      union(
+                        methyl_counts_list[[i]]$pos_index,
+                        methyl_counts_list[[i+1]]$pos_index))
+}
+message("There are total ", length(union_list), " methylated regions.")
+```
+
+## CpG 
+***
+Distribution of those methylated regions among CpG islands, CpG shores, and inter CpG regions
+
+```{r methylated_cpg}
+```
+
+## Genes
+***
+Distribution of those methylated regions among promoter, exon, and intron regions.
+```{r methylated_genes}
+```
+
+# DMR analysis
+## Get annotated DMR
+***
 Get annotated DMR for 5hmc + 5mc, 5hmc, and 5mc.
-```{r annotated_DMR}
+
+```{r annotated_DMR, eval=FALSE}
 dmrList <- list.files(dmrDir)
 
 ## Annotate CpG islands
@@ -97,16 +176,78 @@ for (file in dmrList) {
 }
 ```
 
-# Overview 
+
+## Overview analysis
 ***
 Some over analysis for the total dmr
 
 ```{r overview_cpg}
-# Total number of DMR
-cpg_list <- list()
+# Read the annotated DMR
+dmr_list <- list()
 for (file in list.files(annotatedDmrDir)) {
-  dmr_fname <- unlist(strsplit(file, "_"))
+  dmr_fname_index <- unlist(strsplit(unlist(strsplit(file, "\\."))[1], "_"))
+  annotation <- dmr_fname_index[1]
+  type <- dmr_fname_index[4]
+  tissue <- dmr_fname_index[6]
+  weeks <- dmr_fname_index[7]
+  index <- paste0(annotation, "_", type, "_", tissue, "_", weeks)
+  dmr_list[[index]] <- read.csv(here::here(annotatedDmrDir, file))
 }
 
-cpg_annotated_DMR_5hmc_2018_SI_3
+# Total number of unique DMR
+union <- list()
+for (i in 1:(length(dmr_list)-1)) {
+  annotation <- unlist(strsplit(names(dmr_list[i]), "_"))[1]
+  dmr_type <- unlist(strsplit(names(dmr_list[i]), "_"))[2]
+  
+  if(annotation == "cpg") {
+    tmp_df1 <- dmr_list[[i]] |>
+      dplyr::mutate(index = paste0(chr, "_", start, "_", end)) |>
+      dplyr::select(index)
+    tmp_df2 <- dmr_list[[i+1]] |>
+      dplyr::mutate(index = paste0(chr, "_", start, "_", end)) |>
+      dplyr::select(index)
+    tmp_list <- union(tmp_df1$index, tmp_df2$index)
+    union <- union(union, tmp_list)
+  }
+}
+message("Total ", length(union), " DMRs were obtained.\n")
+
+# Total number of unique 5mc DMR
+union <- list()
+for (i in 1:(length(dmr_list)-1)) {
+  annotation <- unlist(strsplit(names(dmr_list[i]), "_"))[1]
+  dmr_type <- unlist(strsplit(names(dmr_list[i]), "_"))[2]
+  
+  if (dmr_type == "5mc" && annotation == "cpg") {
+    tmp_df1 <- dmr_list[[i]] |>
+      dplyr::mutate(index = paste0(chr, "_", start, "_", end)) |>
+      dplyr::select(index)
+    tmp_df2 <- dmr_list[[i+1]] |>
+      dplyr::mutate(index = paste0(chr, "_", start, "_", end)) |>
+      dplyr::select(index)
+    tmp_list <- union(tmp_df1$index, tmp_df2$index)
+    union <- union(union, tmp_list)
+  }
+}
+message("Total ", length(union), " 5mc DMRs were obtained.\n")
+
+union <- list()
+for (i in 1:(length(dmr_list)-1)) {
+  annotation <- unlist(strsplit(names(dmr_list[i]), "_"))[1]
+  dmr_type <- unlist(strsplit(names(dmr_list[i]), "_"))[2]
+  
+  if (dmr_type == "5hmc" && annotation == "cpg") {
+    tmp_df1 <- dmr_list[[i]] |>
+    dplyr::mutate(index = paste0(chr, "_", start, "_", end)) |>
+    dplyr::select(index)
+  tmp_df2 <- dmr_list[[i+1]] |>
+    dplyr::mutate(index = paste0(chr, "_", start, "_", end)) |>
+    dplyr::select(index)
+  tmp_list <- union(tmp_df1$index, tmp_df2$index)
+  union <- union(union, tmp_list)
+  }
+}
+message("Total ", length(union), " 5hmc DMRs were obtained.\n")
+
 ```
