@@ -1,0 +1,422 @@
+---
+title: "Analysis for differentially-expressed genes between different ages in SPF mice"
+output: html_document
+date: "2024-06-22"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Library and functions
+***
+
+```{r library}
+library(TxDb.Mmusculus.UCSC.mm10.knownGene)
+txdb <- TxDb.Mmusculus.UCSC.mm10.knownGene
+
+## Get keys for each dataset, key is the transcript name (TXNAME)
+## Note: select methods will be masked if dplyr is run somewhere
+k <- keys(txdb, keytype = "TXNAME")
+tx2gene <- select(txdb, k, "GENEID", "TXNAME")
+tx2gene <- tx2gene[!is.na(tx2gene$GENEID), ]
+
+## packages for import salmon data
+library(tximport)
+
+## import a package for querying SQLite-based annotation data packages
+library(AnnotationDbi)
+
+## Link Entrez GeneID to Gene Symbol
+library(org.Mm.eg.db)
+
+## import packages for differential expression analysis
+library(DESeq2)
+
+## Plot
+library(ggplot2)
+library(pheatmap)
+library(ggfortify)
+library(ggrepel)
+
+## pathyway analysis
+library(fgsea)
+hallmark.pathways <- gmtPathways(here::here("./gmt/mh.all.v2023.2.Mm.symbols.gmt"))
+cp.pathways <- gmtPathways(here::here("./gmt/m2.cp.v2023.2.Mm.symbols.gmt"))
+
+## Venn
+library(VennDiagram)
+
+## UpSet
+library(UpSetR)
+
+## Functions
+devtools::load_all()
+```
+
+# Set up the dir
+***
+
+```{r dir}
+tpmDir <- here::here("./Results/Statistics/TPM/")
+degDir <- here::here("./Results/Statistics/DEG_normal_aging/")
+figureDir <- here::here("Results/Figures/")
+```
+
+# TODO
+***
+
+```{r todo}
+# Run bash
+```
+
+# sample sheet
+***
+
+```{r sample_sheet}
+sampleSheet <- read.csv(here::here("./Doc/sampleSheet/RNAseq.csv"))
+
+# Arrange the sample sheet
+# assign file path
+sampleSheet$fpath <- paste(here::here("./Results/Preprocessed/RNAseq/", sampleSheet$Code, "salmon_quant", "quant.sf"))
+
+# new variable
+sampleSheet <- sampleSheet |>
+  dplyr::mutate(GF.SPF_Weeks = paste0(GF.SPF, "_", Weeks),
+                Organ_GF.SPF = paste0(Organ, "_", GF.SPF),
+                Weeks.factor = factor(Weeks))
+
+# sample name
+sampleSheet$sample <- paste(sampleSheet$Organ, sampleSheet$GF.SPF, sampleSheet$Weeks, sampleSheet$Replicate, sep = "_")
+```
+
+# Get count matrix
+***
+We first read TPM data from salmon output and save the counts for only SPF samples.
+
+```{r salmon, eval=FALSE}
+sampleSheet <- sampleSheet |>
+  dplyr::filter(GF.SPF == "SPF")
+
+# Check files exist
+file.exists(sampleSheet$fpath)
+
+# This package summarize the transcripts into genes
+txi.tx <- tximport(sampleSheet$fpath, type = "salmon", tx2gene = tx2gene)
+
+# Read the count and annotate it
+count <- as.data.frame(txi.tx$counts)
+colnames(count) <- sampleSheet$sample
+
+# Save count
+write.csv(count, here::here(tpmDir, "TPM_SPF_all_organ_all_age.csv"), row.names = FALSE)
+
+remove(txi.tx, count)
+```
+
+# Overview
+***
+
+## Count
+
+```{r count}
+count <- read.csv(here::here(tpmDir, "TPM_SPF_all_organ_all_age.csv"))
+```
+
+## Correlation matrix
+```{r cor}
+mtx <- cor(count, method = "spearman")
+annot_col <- data.frame(row.names = sampleSheet$sample,
+                       GF.SPF_Weeks = sampleSheet$GF.SPF_Weeks,
+                       Organ = sampleSheet$Organ)
+p.cor <- pheatmap(mtx,fontsize = 4,annotation_col = annot_col,
+                  scale="row",
+                  clustering_distance_cols = as.dist(1 - mtx),
+                  clustering_distance_rows = as.dist(1 - mtx))
+# cannot directly save the pheatmap object to pdf
+savePheatmapPdf(p.cor, here::here(figureDir, "SPF_correlation_matrix.pdf"))
+p.cor
+
+```
+
+# Differential expression analysis
+
+## Differentially-expressed genes (DEG)
+***
+We used DESeq2 to perform differential expression analysis between 3-weeks-old and 17- or 78-weeks-old samples at each tissue. The definition of differentially-expressed genes are genes with significant changes in 17/78 vs 3 samples (log2FC > 1 or < -1, padj < 0.05).
+
+```{r deg}
+deg_list <- list()
+deg_filtered_list <- list()
+for (tissue in c("SI", "Ce", "LI")) {
+  for (week in c("17", "78")) {
+    condition <- c("3", week)
+    sampleSheet_subset <- sampleSheet |>
+      dplyr::filter(Organ == !!tissue) |>
+      dplyr::filter(Weeks.factor %in% condition)
+    
+    txi.tx <- tximport(sampleSheet_subset$fpath, type = "salmon", tx2gene = tx2gene)
+    ddsTxi <- DESeqDataSetFromTximport(txi.tx,
+                                       colData = sampleSheet_subset,
+                                       design = ~ Weeks.factor)
+    
+    dds <- DESeq(ddsTxi)
+    
+    # Get the results
+    res <- results(dds, contrast=c("Weeks.factor",week,"3"))
+    res_annotated <- annotateGENEID(res, org.Mm.eg.db)
+    
+    # Save it to a list
+    condition <- paste0("SPF_", tissue, "_", week)
+    deg_list[[condition]] <- res_annotated
+    deg_filtered_list[[condition]] <- res_annotated |>
+      dplyr::filter(padj < 0.05) |>
+      dplyr::filter(abs(log2FoldChange) > 1) |>
+      dplyr::filter(!is.na(SYMBOL))
+    
+    # Save the final data frame
+    write.csv(res_annotated, here::here(degDir, paste0("DEA_", condition, ".csv")), row.names = FALSE)
+  }
+}
+
+```
+
+## Number of DEG
+***
+Let's have a look for the overview analysis of DEGs.
+
+```{r deg_overview}
+deg_df <- matrix(ncol=5, nrow=0)
+colnames(deg_df) <- c("sample", "Tissue", "Weeks", "direction", "num_deg")
+
+# Create a number of DEGs for each tissue ====
+for (i in 1:length(deg_filtered_list)) {
+  sample <- names(deg_filtered_list[i])
+  condition <- unlist(strsplit(names(deg_filtered_list[i]), "_"))
+  
+  # Get the numbers of DEGs
+  num_up_deg <- deg_filtered_list[[i]] |>
+    dplyr::filter(log2FoldChange > 0) |>
+    nrow()
+  
+  num_down_deg <- deg_filtered_list[[i]] |>
+    dplyr::filter(log2FoldChange < 0) |>
+    nrow()
+  
+  tmp_df <- data.frame(sample =  c(sample, sample),
+                       Tissue = c(condition[2], condition[2]),
+                       Weeks = c(condition[3], condition[3]),
+                       direction =c("up", "down"),
+                       num_deg = c(num_up_deg, num_down_deg))
+  
+  deg_df <- rbind(deg_df, tmp_df)
+}
+remove(tmp_df, i)
+
+# Annotation of heatmap
+annot_col <- data.frame(row.names = sampleSheet$sample,
+                        GF.SPF_Weeks = sampleSheet$GF.SPF_Weeks,
+                        Organ = sampleSheet$Organ)
+# upregulated genes
+# Generate matrix and make figures
+deg_df_subset <- deg_df |> 
+  dplyr::filter(direction == "up") |> 
+  dplyr::select(Tissue, Weeks, num_deg)
+deg_mtx <- reshape(deg_df_subset, idvar = "Tissue", timevar = "Weeks", direction = "wide")
+deg_mtx <- as.matrix(deg_mtx[,2:ncol(deg_mtx)])
+colnames(deg_mtx) <- c(17, 78)
+rownames(deg_mtx) <- c("SI", "Ce", "LI")
+
+p <- pheatmap(deg_mtx,fontsize = 4,
+              colorRampPalette(c("white","red"))(100),
+              cluster_cols=FALSE, cluster_rows=FALSE,scale="row")
+# cannot directly save the pheatmap object to pdf
+savePheatmapPdf(p, here::here(figureDir, "SPF_num_up_deg_heatmap.pdf"))
+p
+
+# downregulated genes
+# Generate matrix and make figures
+deg_df_subset <- deg_df |> 
+  dplyr::filter(direction == "down") |> 
+  dplyr::select(Tissue, Weeks, num_deg)
+deg_mtx <- reshape(deg_df_subset, idvar = "Tissue", timevar = "Weeks", direction = "wide")
+deg_mtx <- as.matrix(deg_mtx[,2:ncol(deg_mtx)])
+colnames(deg_mtx) <- c(17, 78)
+rownames(deg_mtx) <- c("SI", "Ce", "LI")
+
+p <- pheatmap(deg_mtx,fontsize = 4,
+              colorRampPalette(c("white","blue"))(100),
+              cluster_cols=FALSE, cluster_rows=FALSE,scale="row")
+# cannot directly save the pheatmap object to pdf
+savePheatmapPdf(p, here::here(figureDir, "SPF_num_down_deg_heatmap.pdf"))
+p
+```
+
+## Venn
+***
+
+```{r venn}
+# Get the union DEG list ====
+union_deg_list <- list()
+for (i in 1:(length(deg_filtered_list)-1)) {
+  tmp_deg_list <- union(deg_filtered_list[[i]]$SYMBOL,
+                        deg_filtered_list[[i+1]]$SYMBOL)
+  union_deg_list <- union(union_deg_list, tmp_deg_list)
+}
+
+# Get the intersect DEG list ====
+## None
+intersect_deg_list <- list()
+for (i in 1:(length(deg_filtered_list)-1)) {
+  tmp_deg_list <- intersect(deg_filtered_list[[i]]$SYMBOL,
+                            deg_filtered_list[[i+1]]$SYMBOL)
+  intersect_deg_list <- intersect(intersect_deg_list, tmp_deg_list)
+}
+
+# Venn plot ====
+# Normal aging-associated DEGs in each tissue
+## All
+for (tissue in c("SI", "Ce", "LI")) {
+  set1 <- paste0("SPF_", tissue, "_", 17)
+  set2 <- paste0("SPF_", tissue, "_", 78)
+  venn.diagram(
+    x = list(deg_filtered_list[[set1]]$SYMBOL, 
+             deg_filtered_list[[set2]]$SYMBOL),
+    category.names = c("17" , "78"),
+    filename = here::here(figureDir, paste0("SPF_", tissue, '_venn_microbiota_DEG.png')),
+    output=TRUE
+  )
+}
+
+for (tissue in c("SI", "Ce", "LI")) {
+  set1 <- paste0("SPF_", tissue, "_", 17)
+  set2 <- paste0("SPF_", tissue, "_", 78)
+  
+  set1_df <-  deg_filtered_list[[set1]] |>
+    dplyr::filter(log2FoldChange > 0) |>
+    dplyr::select(SYMBOL)
+  
+  set2_df <-  deg_filtered_list[[set2]] |>
+    dplyr::filter(log2FoldChange > 0) |>
+    dplyr::select(SYMBOL)
+  venn.diagram(
+    x = list(na.omit(set1_df$SYMBOL), 
+             na.omit(set2_df$SYMBOL)),
+    category.names = c("17" , "78"),
+    filename = here::here(figureDir, paste0("SPF_", tissue, '_venn_microbiota_up_DEG.png')),
+    output=TRUE
+  )
+}
+
+for (tissue in c("SI", "Ce", "LI")) {
+  set1 <- paste0("SPF_", tissue, "_", 17)
+  set2 <- paste0("SPF_", tissue, "_", 78)
+  
+  set1_df <-  deg_filtered_list[[set1]] |>
+    dplyr::filter(log2FoldChange < 0) |>
+    dplyr::select(SYMBOL)
+  
+  set2_df <-  deg_filtered_list[[set2]] |>
+    dplyr::filter(log2FoldChange < 0) |>
+    dplyr::select(SYMBOL)
+  
+  venn.diagram(
+    x = list(na.omit(set1_df$SYMBOL), 
+             na.omit(set2_df$SYMBOL)),
+    category.names = c("17" , "78"),
+    filename = here::here(figureDir, paste0("SPF_", tissue, '_venn_microbiota_down_DEG.png')),
+    output=TRUE
+  )
+}
+```
+
+## GESEA
+***
+Pathway analysis for each tissue.
+
+```{r GSEA}
+
+## Create ranked list
+highest_deg_df <- data.frame(matrix(ncol=1, nrow=0))
+
+for (tissue in c("SI", "Ce", "LI")) {
+  for (age in c(17, 78)) {
+    set <- paste0("SPF_", tissue, "_", age)
+    
+    df <-  deg_filtered_list[[set]] |>
+      dplyr::mutate(ranked_padj = ifelse(log2FoldChange > 0, -log10(padj), log10(padj))) |>
+      dplyr::arrange(desc(ranked_padj)) |>
+      dplyr::select(SYMBOL, ranked_padj)
+    
+    ranks <- unlist(df$ranked_padj)
+    names(ranks) <- df$SYMBOL
+    
+    fgseaRes <- fgsea(pathways=hallmark.pathways, stats=ranks, nperm=5000)
+    
+    fgseaResTidy <- fgseaRes |>
+      dplyr::arrange(desc(NES)) |> 
+      dplyr::select(-leadingEdge, -ES, -nMoreExtreme) |>
+      dplyr::arrange(padj)
+    
+    write.csv(fgseaResTidy, here::here(degDir, paste0("FGSEA_SPF_", tissue, "_", age, ".csv")), row.names = FALSE)
+    
+    fgseaResTidy$pathway <- gsub("HALLMARK_", "", fgseaResTidy$pathway)
+    fgseaResTidy$pathway <- gsub("_", " ", fgseaResTidy$pathway)
+    fgseaResTidy$pathway <- tolower(fgseaResTidy$pathway)
+    fgseaResTidy$pathway <- stringr::str_to_title(fgseaResTidy$pathway)    
+    
+    ggplot(fgseaResTidy, aes(reorder(pathway, NES), NES)) +
+      geom_col(aes(fill=padj<0.1)) +
+      coord_flip() +
+      labs(x="Pathway", y="Normalized Enrichment Score",
+           title="Hallmark pathways NES from GSEA") + 
+      theme_minimal()
+    
+    ggsave(here::here("./Results/Figures", paste0("FGSEA_SPF_", tissue, "_", age, ".pdf")))
+    
+  }
+}
+```
+
+## 
+***
+
+
+## Volcano plot
+***
+
+```{r deg_volcano_plot}
+
+## Read list
+deg_list <- list()
+for (tissue in c("SI", "Ce", "LI")) {
+  for (age in c(3, 17, 78)) {
+    index <- paste0("DEA_", tissue, "_", age)
+    fname <- paste0(index, ".csv")
+    df <- read.csv(here::here("./Results/Statistics/DEG", fname))
+    df$diffexpressed <- "NO"
+    df$diffexpressed[df$log2FoldChange > 1 & df$padj < 0.05] <- "UP"
+    df$diffexpressed[df$log2FoldChange < -1 & df$padj < 0.05] <- "DOWN"
+    df$delabel <- ifelse(df$SYMBOL %in% head(df[order(df$padj), "SYMBOL"], 20), df$SYMBOL, NA)
+    deg_list[[index]] <- df
+  }
+}
+
+## Plot
+for (i in 1:length(deg_list)) {
+  df <- deg_list[[i]]
+  index <- names(deg_list[i])
+  ggplot(data = df, aes(x = log2FoldChange, y = -log10(padj), col = diffexpressed, label = delabel)) +
+    geom_vline(xintercept = c(-1, 1), col = "gray", linetype = 'dashed') +
+    geom_hline(yintercept = -log10(0.05), col = "gray", linetype = 'dashed') + 
+    scale_color_manual(values = c("blue", "grey", "red"), 
+                       labels = c("Downregulated", "Not significant", "Upregulated")) +
+    geom_point() +
+    geom_text_repel(max.overlaps = Inf) 
+  ggsave(here::here("./Results/Figures", paste0(index, ".pdf")))
+}
+```
+
+## Microbiota x Aging 
+***
