@@ -331,7 +331,7 @@ for (tissue in c("SI", "Ce", "LI")) {
 }
 ```
 
-## GESEA
+## GSEA
 ***
 Pathway analysis for each tissue.
 

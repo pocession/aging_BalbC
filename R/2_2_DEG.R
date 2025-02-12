@@ -115,7 +115,7 @@ for (organ in c("SI", "LI", "Ce")) {
     sample_sheet_subset <- sampleSheet |>
       dplyr::filter(Organ == !!organ) |>
       dplyr::filter(Weeks == !!week) |>
-      dplyr::mutate(condition = GF.SPF)
+      dplyr::mutate(condition = factor(GF.SPF, levels = c("GF", "SPF")))
     count_filtered_subset <- count_filtered[,rownames(sample_sheet_subset)]
     dea_results <- performCountDEAByDeseq2(
       sample_sheet = sample_sheet_subset, 
