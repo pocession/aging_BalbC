@@ -32,3 +32,14 @@ getFilteredCounts <- function(min_abundance = 5, min_proportion = 0.5, count) {
   filtered_count <- count[keep_genes, ]
   return(filtered_count)
 }
+
+# savePheatmapPdf
+# Define a function to save the pheatmap object to a PDF
+savePheatmapPdf <- function(x, filename, width = 7, height = 7) {
+  stopifnot(!missing(x))
+  stopifnot(!missing(filename))
+  pdf(filename, width = width, height = height)
+  grid::grid.newpage()
+  grid::grid.draw(x$gtable)
+  dev.off()
+}
